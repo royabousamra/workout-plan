@@ -150,13 +150,16 @@ const FIG = (function () {
       arm: [[...mid(S.sl, S.aL.j), 14], [...mid(S.sr, S.aR.j), 14]],
       thigh: [[...mid(S.hl, S.lL.j, 0.55), 19], [...mid(S.hr, S.lR.j, 0.55), 19]],
       hipj: [[S.hl[0] - 4, S.hl[1], 17], [S.hr[0] + 4, S.hr[1], 17]],
-      upperback: [[S.sc[0], S.sc[1] + 13, 27]]
+      upperback: [[S.sc[0], S.sc[1] + 13, 27]],
+      innerL: [[mid(S.hl, S.lL.j, 0.5)[0] + 8, mid(S.hl, S.lL.j, 0.5)[1], 15]],
+      oblique: [[...mid(S.sr, S.hr, 0.55), 17]]
     };
   }
   function drawFR(ex, P, rear) {
     const S = solveFront(P);
     let o = "";
-    if (ex.pb) o += ex.pb(S);
+    const bg = ex.pb ? ex.pb(S) : "";
+    if (P.rot == null) o += bg;
     o += pl([S.hl, S.lL.j, S.lL.e], 16, C.pants) + pl([S.hr, S.lR.j, S.lR.e], 16, C.pants);
     o += ln(S.lL.e, [S.lL.e[0] - P.fo, S.lL.e[1] + 7], 10, C.shoe) + ln(S.lR.e, [S.lR.e[0] + P.fo, S.lR.e[1] + 7], 10, C.shoe);
     o += `<polygon points="${f1(S.hl[0] - 4)},${f1(S.c[1] - 6)} ${f1(S.hr[0] + 4)},${f1(S.c[1] - 6)} ${f1(S.hr[0] + 4)},${f1(S.c[1] + 16)} ${f1(S.hl[0] - 4)},${f1(S.c[1] + 16)}" fill="${C.pants}" stroke="${C.pants}" stroke-width="6" stroke-linejoin="round"/>`;
@@ -171,7 +174,14 @@ const FIG = (function () {
     if (!P.armsBehind) { if (ex.pm) o += ex.pm(S); o += arms; }
     if (!P.headBehind) o += head;
     if (ex.pf) o += ex.pf(S);
-    return {svg: o, anchors: anchorsFront(S)};
+    let an = anchorsFront(S);
+    if (P.rot != null){
+      const [px, py] = P.piv, ca = Math.cos(rad(P.rot)), sa = Math.sin(rad(P.rot));
+      const rp = a => [px + (a[0] - px) * ca - (a[1] - py) * sa, py + (a[0] - px) * sa + (a[1] - py) * ca, a[2]];
+      o = bg + `<g transform="rotate(${f1(P.rot)} ${px} ${py})">${o}</g>`;
+      for (const k in an) an[k] = an[k].map(rp);
+    }
+    return {svg: o, anchors: an};
   }
 
   // ---------- exercises ----------
@@ -275,6 +285,56 @@ const FIG = (function () {
       ], segT: 0.5, segH: 0.1,
       pf: S => db(S.armF.e, 0, 1.05) + db(S.armN.e, 0), glow: ["lat", "core"],
       tl: ["March in place, stand tall", "March in place, stand tall", "March in place, stand tall", "March in place, stand tall"]
+    },
+
+    // ---- Lower B (4-day plan) ----
+    "Split squat": {
+      a: {hip: [175, 160], t: 3, f: [215, 254], f2: [128, 250], fa2: 60, hd: [179, 165]},
+      b: {hip: [173, 205], t: 3, f: [215, 254], f2: [128, 250], fa2: 60, hd: [177, 210]},
+      pf: S => db(S.armN.e, 0), glow: ["thigh", "glute"], ge: 0.5,
+      tm: [2.0, 0.3, 1.2, 0.6], tl: ["Lower straight down", "", "Push through your front heel", ""]
+    },
+    "Single-leg Romanian deadlift": {
+      a: {hip: [198, 153], t: 3, h: -3, f: [203, 254], f2: [194, 252], hd: [210, 160]},
+      b: {hip: [190, 160], t: 80, h: -10, f: [203, 254], f2: [88, 178], fa2: 90, hd: [249, 215]},
+      pf: S => db(S.armN.e, 0), glow: ["glute", "thigh"], ge: 0.5,
+      tm: [2.4, 0.3, 1.4, 0.5], tl: ["Hinge forward, back leg floats up", "", "Squeeze your glute to stand", ""]
+    },
+    "Single-leg glute bridge": {
+      a: {hip: [262, 248], t: -90, h: 0, f: [300, 254], f2: [315, 158.6], fa2: -60, hd: [258, 254], ab: 1},
+      b: {hip: [256.8, 223.6], t: -114, h: 24, f: [300, 254], f2: [351.5, 180.8], fa2: -60, hd: [258, 254], ab: 1},
+      pb: () => mat(), glow: ["glute"], ge: 1,
+      tm: [1.1, 1.0, 2.0, 0.4], tl: ["Drive through your heel, hips up", "Squeeze 1 sec, hips level", "Lower slowly", ""]
+    },
+    "Bird dog": {
+      a: {hip: [170, 203], t: 83.3, h: 10, f: [118, 258], fa: 172, f2: [112, 258], fa2: 172, arm: [0, 0], arm2: [0, 0], armFront: true},
+      b: {hip: [170, 203], t: 83.3, h: 10, f: [118, 258], fa: 172, f2: [66, 203], fa2: 95, arm: [95, 95], arm2: [0, 0], armFront: true},
+      pb: () => mat(), glow: ["back", "glute", "core"], ge: 1,
+      tm: [1.6, 1.5, 1.6, 0.6], tl: ["Reach arm forward, opposite leg back", "Hold 2–3 sec, hips level", "Return slowly", ""]
+    },
+    "Dumbbell thruster": {
+      seq: [
+        {hip: [192, 152], t: 4, h: -4, f: [200, 254], hd: [214, 96], armFront: true},
+        {hip: [160, 196], t: 32, h: -22, f: [200, 254], hd: [208, 150], armFront: true},
+        {hip: [192, 152], t: 2, h: 0, f: [200, 254], hd: [198, 26], armFront: true}
+      ], segT: 1.3, segH: 0.3,
+      pf: S => db(S.armF.e, 0, 1.05) + db(S.armN.e, 0), glow: ["thigh", "glute", "delt", "arm"],
+      tl: ["Squat down, weights at shoulders", "Drive up and press overhead", "Lower the weights to your shoulders"]
+    },
+    "Side plank": {
+      v: "f",
+      a: {c: [110, 150], fl: [104, 254], fr: [116, 254], fo: 8, armL: [102, 102], armR: [78, 168], rot: 72, piv: [110, 258]},
+      b: {c: [110, 150], fl: [104, 254], fr: [116, 254], fo: 8, armL: [102, 102], armR: [78, 168], rot: 71, piv: [110, 258]},
+      pb: () => mat(), glow: ["oblique"], ge: 0.5,
+      tm: [2.5, 0, 2.5, 0], tl: ["Hold: hips up, body straight", "Hold: hips up, body straight", "Hold: hips up, body straight", "Hold: hips up, body straight"]
+    },
+    "Band hip adduction": {
+      v: "f",
+      a: {c: [204, 150], fl: [150, 247], fr: [214, 254], hl: [186, 146], hr: [222, 146], al: -1, ar: 1},
+      b: {c: [204, 150], fl: [200, 248], fr: [214, 254], hl: [186, 146], hr: [222, 146], al: -1, ar: 1},
+      pb: () => `<rect x="38" y="14" width="16" height="${G - 14}" fill="${C.wood}"/><rect x="50" y="240" width="10" height="12" rx="2" fill="${C.prop}"/>`,
+      pf: S => ln([56, 246], S.lL.e, 4, C.band), glow: ["innerL"], ge: 1,
+      tm: [1.0, 0.6, 1.8, 0.4], tl: ["Sweep your leg in", "Squeeze your inner thigh", "Let it out slowly", ""]
     },
 
     // ---- rear view (so the upper-back muscles are visible) with a small side-view inset ----

@@ -184,6 +184,7 @@
   .danger{color:#a8452d}
   .dataops h3{margin-top:0}
   /* ---- player additions ---- */
+  .nophoto{flex:1;align-self:center;font-size:12.5px;color:var(--muted);padding-left:4px}
   .wrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px}
   .wrow label{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
   .wrow input{flex:1;min-width:150px;font:inherit;font-size:15px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px}
@@ -387,6 +388,34 @@ const EX = {
     photo:null,
     cues:["Hold the loop band at chest height with straight arms, hands about shoulder-width.","Pull the band apart by squeezing your shoulder blades together.","Bring it toward your chest, pause, then return slowly.","Keep your shoulders down, not shrugged up by your ears."],
     easier:"Use a thinner band or hold your hands wider apart."},
+  "Split squat": {img:"Split_Squats", vq:"dumbbell split squat form", vid:"u705lnY8CBc", board:"Stand with your front foot on the platform and a band set under it, holding the handles at your shoulders.", focus:["Quads","Glutes","Inner thighs","Balance"],
+    photo:"The photo shows the bodyweight version. Hold a dumbbell in each hand once that feels easy.",
+    cues:["Take a long step back into a split stance, feet hip-width apart like on train tracks, back heel up.","Hold a dumbbell in each hand at your sides and stand tall.","Lower straight down until your back knee is just above the floor. Keep your front knee over your ankle.","Push through your front heel to come up. Finish all reps, then switch legs."],
+    easier:"Use no weight, hold a wall or door frame for balance, and go only partway down."},
+  "Side plank": {img:"Side_Bridge", vq:"side plank proper form beginner", vid:"44ND4bOB-T0", focus:["Obliques (waist)","Deep core","Shoulders"], cap:["Set up","Hold"],
+    photo:null,
+    cues:["Lie on your side with your elbow under your shoulder and legs straight, feet stacked.","Lift your hips until you make a straight line from head to feet.","Push the floor away with your forearm so you don't sink into your shoulder.","Hold and keep breathing, then switch sides."],
+    easier:"Bend your knees to 90° and balance on your knees and forearm instead of your feet."},
+  "Single-leg Romanian deadlift": {img:"Kettlebell_One-Legged_Deadlift", vq:"single leg romanian deadlift dumbbell form", vid:"k83AIfjDbnI", board:"Stand on the platform on one leg with a band under that foot, holding the handle in the opposite hand, and hinge the same way.", focus:["Hamstrings","Glutes","Balance","Core"],
+    photo:"The photo uses a kettlebell. A dumbbell in the hand opposite your standing leg works the same.",
+    cues:["Stand on your left leg with a slight knee bend. Hold a dumbbell in your right hand.","Hinge at the hips like a seesaw: your chest lowers as your right leg floats straight back.","Go until your body is close to parallel with the floor or you feel a stretch behind your thigh. Keep hips square, back toes pointing down.","Squeeze your glute to stand back up. Finish the reps, then switch sides."],
+    easier:"Use no weight and touch a wall with your free hand, or keep your back toes lightly on the floor like a kickstand."},
+  "Band hip adduction": {img:"Band_Hip_Adductions", vq:"standing band hip adduction door anchor", vid:"FZfZuK2sjwo", focus:["Inner thighs","Hips","Balance"],
+    photo:"The band is hard to see in the photo. Clip your door anchor near the bottom of the door and loop the band around the ankle closest to it.",
+    cues:["Close the door on your anchor near the floor. Use a long band (a tube band handle around your ankle works).","Stand side-on to the door, step away until the band is a little tight, and loop it around the ankle nearest the door.","Stand tall with hands on your hips (or one hand on a wall). Sweep that leg in toward and slightly past your standing leg, keeping it straight.","Squeeze your inner thigh, then let the leg out slowly. Turn around to do the other side."],
+    easier:"Stand closer to the door or use a lighter band so there's less tension."},
+  "Dumbbell thruster": {img:"Kettlebell_Thruster", vq:"dumbbell thruster form beginner", vid:"rmDQVX-G0zo", board:"Stand on the platform with a band under it and the handles at your shoulders, then squat and press the same way.", focus:["Quads","Glutes","Shoulders","Triceps (back of arm)","Core"], cap:["Top","Bottom"],
+    photo:"The photo uses kettlebells. Dumbbells held at your shoulders work the same.",
+    cues:["Hold a dumbbell in each hand at your shoulders, palms facing each other, feet shoulder-width apart.","Squat down with your chest up and elbows pointing forward.","Drive up through your heels and use that push to press the dumbbells overhead in one smooth motion.","Lower the weights back to your shoulders with control and go straight into the next squat."],
+    easier:"Hold one dumbbell with both hands, or split it into two moves: squat and stand, then press."},
+  "Single-leg glute bridge": {img:"Single_Leg_Glute_Bridge", vq:"single leg glute bridge proper form", vid:"c6UXqFii7NA", focus:["Glutes","Hamstrings","Core"],
+    photo:null,
+    cues:["Lie on your back with knees bent and feet flat. Straighten one leg so both knees are level.","Drive through the heel of your planted foot and lift your hips into a straight line from shoulders to knee.","Keep your hips level, with no tilting to one side. Squeeze for 1 second at the top.","Lower slowly. Finish the reps, then switch legs."],
+    easier:"Do two-leg glute bridges, or keep the other foot resting lightly on the floor."},
+  "Bird dog": {img:null, vq:"bird dog exercise beginner form", vid:"LaLKNS7mxrk", focus:["Lower & mid back","Glutes","Deep core","Shoulders"],
+    photo:null,
+    cues:["Start on hands and knees: hands under shoulders, knees under hips, back flat.","Brace your abs and slowly reach one arm forward and the opposite leg back until both are level with your body.","Hold 2–3 seconds without tilting your hips or arching your back.","Return slowly and switch sides."],
+    easier:"Move only a leg, or only an arm, until you can hold steady."},
   "Reverse fly": {img:"Reverse_Flyes", vq:"dumbbell reverse fly form", vid:"W_hNkKhtSJg", board:"Stand on the platform with a band set under it, hinge forward, and pull the handles out to the sides.", focus:["Rear delts","Upper back"],
     photo:"The photo shows lying chest-down on an incline bench. At home, hinge forward with a flat back instead, like the side view in the animation.",
     cues:["Use very light dumbbells (start with 2–5 lb).","Arms hang with a slight bend in the elbows.","Lift your arms out to the sides to shoulder height, squeezing your shoulder blades together.","Lower slowly. Don't swing your body."],
@@ -478,14 +507,14 @@ const PROGRAMS = {
       {label:"3A", ex:"Reverse fly", dose:"3 × 12–15", sets:3, with:"3B"},
       {label:"3B", ex:"Overhead triceps extension", dose:"3 × 12–15", sets:3, with:"3A"},
       {label:"Finisher", ex:"Farmer's march", dose:"3 × 30–45 sec", sets:3}]},
-    {key:"Day 4", title:"Lower B", sub:"Wide squat, hinge, bridge, lunge, hips", steps:[
-      {label:"1A", ex:"Sumo goblet squat", dose:"3 × 10–12", sets:3, with:"1B"},
-      {label:"1B", ex:"Dead bug", dose:"2 × 8 per side", sets:2, with:"1A"},
-      {label:"2A", ex:"Dumbbell Romanian deadlift", dose:"3 × 10–12", sets:3, with:"2B"},
-      {label:"2B", ex:"Glute bridge with band", dose:"3 × 12–15", sets:3, with:"2A"},
-      {label:"3A", ex:"Reverse lunge", dose:"3 × 8–10 per leg", sets:3, with:"3B"},
-      {label:"3B", ex:"Lateral band walk", dose:"2 × 15 steps per side", sets:2, with:"3A"},
-      {label:"Finisher", ex:"Plank", dose:"2 × 20–40 sec", sets:2}]}
+    {key:"Day 4", title:"Lower B", sub:"Split squat, single-leg hinge, thruster, inner thighs, core", steps:[
+      {label:"1A", ex:"Split squat", dose:"3 × 8–10 per leg", sets:3, with:"1B"},
+      {label:"1B", ex:"Side plank", dose:"2 × 20–30 sec per side", sets:2, with:"1A"},
+      {label:"2A", ex:"Single-leg Romanian deadlift", dose:"3 × 8 per leg", sets:3, with:"2B"},
+      {label:"2B", ex:"Band hip adduction", dose:"2 × 12–15 per side", sets:2, with:"2A"},
+      {label:"3A", ex:"Dumbbell thruster", dose:"3 × 10–12", sets:3, with:"3B"},
+      {label:"3B", ex:"Single-leg glute bridge", dose:"3 × 10 per side", sets:3, with:"3A"},
+      {label:"Finisher", ex:"Bird dog", dose:"2 × 8 per side", sets:2}]}
   ]}
 };
 Object.values(PROGRAMS).forEach(p => p.days.forEach(d => d.steps.unshift(WARM)));
@@ -810,7 +839,7 @@ function show(){
     let head = `<div class="titlerow"><span class="label">${s.label}</span><h2>${s.ex}</h2></div>`;
     head += s.with ? `<div class="pair">Paired with ${s.with}: do this, rest 30 sec, do ${s.with}, then rest 60–90 sec.</div>` : `<div class="pair">Do this after your pairs are finished.</div>`;
     head += `<div class="chips"><span class="chip dose">${s.dose}</span>` + ex.focus.map(f => `<span class="chip">${f}</span>`).join("") + `</div>`;
-    let media = `<div class="tabs">` + (hasAnim ? `<button class="tab on" data-tab="anim">Animation</button>` : ``) + `<button class="tab${hasAnim ? "" : " on"}" data-tab="photo">Real photos</button></div>`;
+    let media = imgs.length ? `<div class="tabs">` + (hasAnim ? `<button class="tab on" data-tab="anim">Animation</button>` : ``) + `<button class="tab${hasAnim ? "" : " on"}" data-tab="photo">Real photos</button></div>` : `<div class="tabs"><button class="tab on" data-tab="anim">Animation</button><span class="nophoto">No real photos for this one. See the video below.</span></div>`;
     if (hasAnim) media += `<div class="pane" id="pane-anim"><div class="anim" id="anim" title="Tap to pause or play"></div><div class="legend"><span><i class="dot"></i>Red glow = where you should feel it</span><span>Tap to pause</span></div></div>`;
     media += `<div class="pane" id="pane-photo"${hasAnim ? " hidden" : ""}>`;
     if (imgs.length) media += `<div class="photos">` + imgs.map((u, i) => `<figure><img src="${u}" alt="${s.ex}, ${cap[i]}"><figcaption>${cap[i]}</figcaption></figure>`).join("") + `</div>`;
