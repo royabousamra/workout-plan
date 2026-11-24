@@ -363,10 +363,16 @@ const FIG = (function () {
   const dS = t => [Math.sin(rad(t)), Math.cos(rad(t))];     // side view: 0 down, 90 forward, 180 up, 270 back
   const dL = t => [-Math.sin(rad(t)), Math.cos(rad(t))];    // front/rear, left arm: 0 down, 90 out to the side
   const dR = dS;                                            // front/rear, right arm
-  function fk(sh, angs, dir, s) {
-    const u = dir(angs[0]), f = dir(angs[1]);
+  function fk(sh, angs, dir, s, fs) {          // fs: optional forearm scale (forearm pointing toward the viewer)
+    const u = dir(angs[0]), f = dir(angs[1]), k = fs == null ? 1 : fs;
     const j = [sh[0] + u[0] * L.ua * s, sh[1] + u[1] * L.ua * s];
-    return {j, e: [j[0] + f[0] * L.fa * s, j[1] + f[1] * L.fa * s]};
+    return {j, e: [j[0] + f[0] * L.fa * s * k, j[1] + f[1] * L.fa * s * k]};
+  }
+  // legs posed by joint angles: [thigh, shin], same angle convention as the arms
+  function fkLeg(hp, angs, dir) {
+    const u = dir(angs[0]), f = dir(angs[1]);
+    const j = [hp[0] + u[0] * L.th, hp[1] + u[1] * L.th];
+    return {j, e: [j[0] + f[0] * L.sh, j[1] + f[1] * L.sh]};
   }
 
   // svg helpers
@@ -401,7 +407,7 @@ const FIG = (function () {
   // ---------- pose handling ----------
   function normSide(P) {
     const o = Object.assign({h: 0, fa: 27, fa2: 27, lb: 1, ab: -1, as: 1}, P);
-    if (!o.f2) o.f2 = [o.f[0] - 8, o.f[1]];
+    if (!o.f2 && o.f) o.f2 = [o.f[0] - 8, o.f[1]];
     if (o.hd && !o.hd2) o.hd2 = [o.hd[0] - 3, o.hd[1]];
     if (o.arm && !o.arm2) o.arm2 = o.arm;
     return o;
@@ -436,7 +442,8 @@ const FIG = (function () {
     const sh = [hip[0] + d[0] * L.to, hip[1] + d[1] * L.to];
     const ht = rad(P.t + P.h), hdv = [Math.sin(ht), -Math.cos(ht)], hnf = [Math.cos(ht), Math.sin(ht)];
     const head = [sh[0] + hdv[0] * (L.nk + L.hd), sh[1] + hdv[1] * (L.nk + L.hd)];
-    const legN = ik(hip, P.f, L.th, L.sh, P.lb), legF = ik(hip, P.f2, L.th, L.sh, P.lb);
+    const legN = P.leg ? fkLeg(hip, P.leg, dS) : ik(hip, P.f, L.th, L.sh, P.lb);
+    const legF = P.leg2 ? fkLeg(hip, P.leg2, dS) : ik(hip, P.f2, L.th, L.sh, P.lb);
     const as = P.hab != null ? Math.max(0.03, Math.cos(rad(P.hab))) : P.as;   // arm swinging toward the viewer looks shorter
     const armN = P.arm ? fk(sh, P.arm, dS, as) : ik(sh, P.hd, L.ua * as, L.fa * as, P.ab);
     const armF = P.arm2 ? fk(sh, P.arm2, dS, as) : ik(sh, P.hd2, L.ua * as, L.fa * as, P.ab);
@@ -446,7 +453,7 @@ const FIG = (function () {
     const al = (f, off) => [S.hip[0] + S.d[0] * L.to * f + S.nf[0] * off, S.hip[1] + S.d[1] * L.to * f + S.nf[1] * off];
     return {
       back: [[...al(0.68, -6), 22]], chest: [[...al(0.78, 7), 18]], core: [[...al(0.3, 8), 18]],
-      glute: [[...al(0, -8), 19]], thigh: [[...mid(S.hip, S.legN.j, 0.55), 20]],
+      glute: [[...al(0, -8), 19]], thigh: [[...mid(S.hip, S.legN.j, 0.55), 20]], thighF: [[...mid(S.hip, S.legF.j, 0.55), 20]],
       arm: [[...mid(S.sh, S.armN.j, 0.5), 15]], lat: [[...al(0.6, 0), 24]], delt: [[S.sh[0], S.sh[1], 15]]
     };
   }
@@ -475,10 +482,10 @@ const FIG = (function () {
     const SW = 22, HW = 12;
     const hl = [c[0] - HW, c[1]], hr = [c[0] + HW, c[1]], sl = [sc[0] - SW, sc[1]], sr = [sc[0] + SW, sc[1]];
     const head = [sc[0] + P.hx, sc[1] - (L.nk + L.hd) * (0.55 + 0.45 * s) + P.hy];
-    const lL = ik(hl, P.fl, L.th, L.sh, P.bl), lR = ik(hr, P.fr, L.th, L.sh, P.br);
+    const lL = P.lgL ? fkLeg(hl, P.lgL, dL) : ik(hl, P.fl, L.th, L.sh, P.bl), lR = ik(hr, P.fr, L.th, L.sh, P.br);
     const as = P.hab != null ? Math.max(0.03, Math.sin(rad(P.hab))) : P.as;
     const aL = P.armL ? fk(sl, P.armL, dL, as) : ik(sl, P.hl, L.ua * as, L.fa * as, P.al);
-    const aR = P.armR ? fk(sr, P.armR, dR, as) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
+    const aR = P.armR ? fk(sr, P.armR, dR, as, P.fsR) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
     return {c, sc, hl, hr, sl, sr, head, lL, lR, aL, aR, P};
   }
   function anchorsFront(S) {
@@ -497,8 +504,13 @@ const FIG = (function () {
     let o = "";
     const bg = ex.pb ? ex.pb(S) : "";
     if (P.rot == null) o += bg;
-    o += pl([S.hl, S.lL.j, S.lL.e], 16, C.pants) + pl([S.hr, S.lR.j, S.lR.e], 16, C.pants);
-    o += ln(S.lL.e, [S.lL.e[0] - P.fo, S.lL.e[1] + 7], 10, C.shoe) + ln(S.lR.e, [S.lR.e[0] + P.fo, S.lR.e[1] + 7], 10, C.shoe);
+    if (P.lfront){   // left leg crosses in front of the right
+      o += pl([S.hr, S.lR.j, S.lR.e], 16, C.pants) + ln(S.lR.e, [S.lR.e[0] + P.fo, S.lR.e[1] + 7], 10, C.shoe);
+      o += pl([S.hl, S.lL.j, S.lL.e], 16, C.pants) + ln(S.lL.e, [S.lL.e[0] - P.fo, S.lL.e[1] + 7], 10, C.shoe);
+    } else {
+      o += pl([S.hl, S.lL.j, S.lL.e], 16, C.pants) + pl([S.hr, S.lR.j, S.lR.e], 16, C.pants);
+      o += ln(S.lL.e, [S.lL.e[0] - P.fo, S.lL.e[1] + 7], 10, C.shoe) + ln(S.lR.e, [S.lR.e[0] + P.fo, S.lR.e[1] + 7], 10, C.shoe);
+    }
     o += `<polygon points="${f1(S.hl[0] - 4)},${f1(S.c[1] - 6)} ${f1(S.hr[0] + 4)},${f1(S.c[1] - 6)} ${f1(S.hr[0] + 4)},${f1(S.c[1] + 16)} ${f1(S.hl[0] - 4)},${f1(S.c[1] + 16)}" fill="${C.pants}" stroke="${C.pants}" stroke-width="6" stroke-linejoin="round"/>`;
     const arms = pl([S.sl, S.aL.j, S.aL.e], 11, C.skin) + pl([S.sr, S.aR.j, S.aR.e], 11, C.skin) + ci(S.aL.e, 5.5, C.skin) + ci(S.aR.e, 5.5, C.skin);
     const head = rear
@@ -626,49 +638,51 @@ const FIG = (function () {
 
     // ---- Lower B (4-day plan) ----
     "Split squat": {
-      a: {hip: [175, 160], t: 3, f: [215, 254], f2: [128, 250], fa2: 60, hd: [179, 165]},
-      b: {hip: [173, 205], t: 3, f: [215, 254], f2: [128, 250], fa2: 60, hd: [177, 210]},
+      a: {hip: [172, 165], t: 3, f: [224, 254], f2: [116, 249], fa2: 46, arm: [0, 0], arm2: [0, 0]},
+      b: {hip: [172, 199], t: 3, f: [224, 254], f2: [116, 249], fa2: 46, arm: [0, 0], arm2: [0, 0]},
       pf: S => db(S.armN.e, 0), glow: ["thigh", "glute"], ge: 0.5,
       tm: [2.0, 0.3, 1.2, 0.6], tl: ["Lower straight down", "", "Push through your front heel", ""]
     },
     "Single-leg Romanian deadlift": {
-      a: {hip: [198, 153], t: 3, h: -3, f: [203, 254], f2: [194, 252], hd: [210, 160]},
-      b: {hip: [190, 160], t: 80, h: -10, f: [203, 254], f2: [88, 178], fa2: 90, hd: [249, 215]},
-      pf: S => db(S.armN.e, 0), glow: ["glute", "thigh"], ge: 0.5,
+      // near leg = lifted leg (joint angles keep it straight), far leg = standing leg; dumbbell in the near hand = opposite the standing leg
+      a: {hip: [198, 153], t: 3, h: -3, leg: [-8, -35], fa: 20, f2: [203, 254], fa2: 27, arm: [0, 0], arm2: [0, 0]},
+      b: {hip: [190, 153], t: 80, h: -4, leg: [-80, -80], fa: 90, f2: [203, 254], fa2: 27, arm: [0, 0], arm2: [0, 0]},
+      pf: S => db(S.armN.e, 0), glow: ["glute", "thighF"], ge: 0.5,
       tm: [2.4, 0.3, 1.4, 0.5], tl: ["Hinge forward, back leg floats up", "", "Squeeze your glute to stand", ""]
     },
     "Single-leg glute bridge": {
-      a: {hip: [262, 248], t: -90, h: 0, f: [300, 254], f2: [315, 158.6], fa2: -60, hd: [258, 254], ab: 1},
-      b: {hip: [256.8, 223.6], t: -114, h: 24, f: [300, 254], f2: [351.5, 180.8], fa2: -60, hd: [258, 254], ab: 1},
+      a: {hip: [262, 248], t: -90, h: 0, f: [300, 254], leg2: [149.3, 149.3], fa2: -150, hd: [258, 254], ab: 1},
+      b: {hip: [256.8, 223.6], t: -114, h: 24, f: [300, 254], leg2: [114.3, 114.3], fa2: -115, hd: [258, 254], ab: 1},
       pb: () => mat(), glow: ["glute"], ge: 1,
       tm: [1.1, 1.0, 2.0, 0.4], tl: ["Drive through your heel, hips up", "Squeeze 1 sec, hips level", "Lower slowly", ""]
     },
     "Bird dog": {
-      a: {hip: [170, 203], t: 83.3, h: 10, f: [118, 258], fa: 172, f2: [112, 258], fa2: 172, arm: [0, 0], arm2: [0, 0], armFront: true},
-      b: {hip: [170, 203], t: 83.3, h: 10, f: [118, 258], fa: 172, f2: [66, 203], fa2: 95, arm: [95, 95], arm2: [0, 0], armFront: true},
+      a: {hip: [170, 200], t: 80.4, h: 4, f: [118, 254], fa: 172, f2: [112, 254], fa2: 172, arm: [0, 0], arm2: [0, 0], armFront: true},
+      b: {hip: [170, 200], t: 80.4, h: 4, f: [118, 254], fa: 172, f2: [68, 217.3], fa2: 95, arm: [97, 97], arm2: [0, 0], armFront: true},
       pb: () => mat(), glow: ["back", "glute", "core"], ge: 1,
-      tm: [1.6, 1.5, 1.6, 0.6], tl: ["Reach arm forward, opposite leg back", "Hold 2–3 sec, hips level", "Return slowly", ""]
+      tm: [1.6, 2.5, 1.6, 0.6], tl: ["Reach arm forward, opposite leg back", "Hold 2–3 sec, hips level", "Return slowly", ""]
     },
     "Dumbbell thruster": {
       seq: [
-        {hip: [192, 152], t: 4, h: -4, f: [200, 254], hd: [214, 96], armFront: true},
-        {hip: [160, 196], t: 32, h: -22, f: [200, 254], hd: [208, 150], armFront: true},
-        {hip: [192, 152], t: 2, h: 0, f: [200, 254], hd: [198, 26], armFront: true}
-      ], segT: 1.3, segH: 0.3,
+        {hip: [197, 151], t: 3, h: -3, f: [200, 254], arm: [40, 185], armFront: true},
+        {hip: [164, 196], t: 26, h: -16, f: [200, 254], arm: [55, 195], armFront: true},
+        {hip: [197, 151], t: 2, h: 0, f: [200, 254], arm: [180, 180], armFront: true}
+      ], segT: 1.3, segH: 0.15,
       pf: S => db(S.armF.e, 0, 1.05) + db(S.armN.e, 0), glow: ["thigh", "glute", "delt", "arm"],
       tl: ["Squat down, weights at shoulders", "Drive up and press overhead", "Lower the weights to your shoulders"]
     },
     "Side plank": {
+      // seen from the front: support forearm points toward the viewer (short), top arm to the ceiling
       v: "f",
-      a: {c: [110, 150], fl: [104, 254], fr: [116, 254], fo: 8, armL: [102, 102], armR: [78, 168], rot: 72, piv: [110, 258]},
-      b: {c: [110, 150], fl: [104, 254], fr: [116, 254], fo: 8, armL: [102, 102], armR: [78, 168], rot: 71, piv: [110, 258]},
+      a: {c: [110, 150], fl: [104, 254], fr: [116, 254], fo: 8, armL: [104.1, 104.1], armR: [75.9, 165.9], fsR: 0.25, rot: 75.9, piv: [110, 237.8]},
+      b: {c: [110, 150], fl: [104, 254], fr: [116, 254], fo: 8, armL: [104.6, 104.6], armR: [75.4, 165.4], fsR: 0.25, rot: 75.4, piv: [110, 237.8]},
       pb: () => mat(), glow: ["oblique"], ge: 0.5,
       tm: [2.5, 0, 2.5, 0], tl: ["Hold: hips up, body straight", "Hold: hips up, body straight", "Hold: hips up, body straight", "Hold: hips up, body straight"]
     },
     "Band hip adduction": {
       v: "f",
-      a: {c: [204, 150], fl: [150, 247], fr: [214, 254], hl: [186, 146], hr: [222, 146], al: -1, ar: 1},
-      b: {c: [204, 150], fl: [200, 248], fr: [214, 254], hl: [186, 146], hr: [222, 146], al: -1, ar: 1},
+      a: {c: [204, 150], lgL: [23, 23], fr: [214, 254], hl: [186, 146], hr: [222, 146], al: -1, ar: 1, lfront: true},
+      b: {c: [204, 150], lgL: [-14, -14], fr: [214, 254], hl: [186, 146], hr: [222, 146], al: -1, ar: 1, lfront: true},
       pb: () => `<rect x="38" y="14" width="16" height="${G - 14}" fill="${C.wood}"/><rect x="50" y="240" width="10" height="12" rx="2" fill="${C.prop}"/>`,
       pf: S => ln([56, 246], S.lL.e, 4, C.band), glow: ["innerL"], ge: 1,
       tm: [1.0, 0.6, 1.8, 0.4], tl: ["Sweep your leg in", "Squeeze your inner thigh", "Let it out slowly", ""]
