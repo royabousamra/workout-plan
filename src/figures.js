@@ -1,0 +1,393 @@
+/* Animated exercise figures: original SVG illustrations.
+   Views: side ("s", default), front ("f"), rear ("r").
+   Arms can be posed by hand target (IK) or by joint angles (FK). Joint angles make true arcs and keep elbows fixed. */
+const FIG = (function () {
+  const G = 262;                                   // floor line
+  const L = {th: 52, sh: 52, to: 60, nk: 10, hd: 15, ua: 34, fa: 33, ft: 18};
+  const C = {shirt: "#c4553a", skin: "#e9bb9a", skinF: "#f1d0b9", pants: "#3b3849", pantsF: "#7b788c",
+             shoe: "#2b2420", hair: "#2b2420", prop: "#4b4650", mat: "#e6d9cf", floor: "#e9dfd6", bg: "#f7f1ec",
+             band: "#2f9e6b", bandR: "#d9433a", wood: "#d9b684", woodD: "#b8925b"};
+  const rad = d => d * Math.PI / 180;
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const f1 = n => Math.round(n * 10) / 10;
+  const ease = x => x * x * (3 - 2 * x);
+
+  // two-bone inverse kinematics
+  function ik(a, b, l1, l2, bend) {
+    let dx = b[0] - a[0], dy = b[1] - a[1], r = Math.hypot(dx, dy);
+    if (r < 0.001) { dx = 0; dy = 1; r = 1; }
+    const ux = dx / r, uy = dy / r;
+    const d = Math.min(Math.max(r, Math.abs(l1 - l2) + 0.5), l1 + l2 - 0.5);
+    const x = (d * d + l1 * l1 - l2 * l2) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - x * x));
+    const nx = uy * bend, ny = -ux * bend;
+    return {j: [a[0] + ux * x + nx * h, a[1] + uy * x + ny * h], e: [a[0] + ux * d, a[1] + uy * d]};
+  }
+  // forward kinematics from absolute segment angles
+  const dS = t => [Math.sin(rad(t)), Math.cos(rad(t))];     // side view: 0 down, 90 forward, 180 up, 270 back
+  const dL = t => [-Math.sin(rad(t)), Math.cos(rad(t))];    // front/rear, left arm: 0 down, 90 out to the side
+  const dR = dS;                                            // front/rear, right arm
+  function fk(sh, angs, dir, s) {
+    const u = dir(angs[0]), f = dir(angs[1]);
+    const j = [sh[0] + u[0] * L.ua * s, sh[1] + u[1] * L.ua * s];
+    return {j, e: [j[0] + f[0] * L.fa * s, j[1] + f[1] * L.fa * s]};
+  }
+
+  // svg helpers
+  const ln = (p, q, w, c) => `<line x1="${f1(p[0])}" y1="${f1(p[1])}" x2="${f1(q[0])}" y2="${f1(q[1])}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+  const pl = (pts, w, c) => `<polyline points="${pts.map(p => f1(p[0]) + "," + f1(p[1])).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const ci = (p, r, c) => `<circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="${r}" fill="${c}"/>`;
+  const mid = (a, b, k) => [a[0] + (b[0] - a[0]) * (k == null ? 0.5 : k), a[1] + (b[1] - a[1]) * (k == null ? 0.5 : k)];
+  const angOf = (j, e) => Math.atan2(e[1] - j[1], e[0] - j[0]) * 180 / Math.PI;
+
+  // props
+  const db = (p, ang, sc) => `<g transform="translate(${f1(p[0])} ${f1(p[1])}) rotate(${f1(ang)}) scale(${sc || 1.15})"><rect x="-9" y="-2.5" width="18" height="5" rx="2" fill="${C.prop}"/><rect x="-14" y="-9" width="7" height="18" rx="2.5" fill="${C.prop}"/><rect x="7" y="-9" width="7" height="18" rx="2.5" fill="${C.prop}"/></g>`;
+  const dbEnd = p => `<circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="9" fill="${C.prop}"/><circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="3.5" fill="#8d8793"/>`;
+  const mat = () => `<rect x="30" y="${G}" width="340" height="11" rx="5" fill="${C.mat}"/>`;
+  const bench = (x, y, w) => `<rect x="${x}" y="${y}" width="${w}" height="10" rx="3" fill="${C.wood}"/><rect x="${x + 7}" y="${y + 10}" width="8" height="${G - y - 10}" fill="${C.woodD}"/><rect x="${x + w - 15}" y="${y + 10}" width="8" height="${G - y - 10}" fill="${C.woodD}"/>`;
+  const ring = (a, b, k, col) => {
+    const p = mid(a, b, k), dx = b[0] - a[0], dy = b[1] - a[1], r = Math.hypot(dx, dy) || 1, nx = -dy / r, ny = dx / r;
+    return ln([p[0] + nx * 11, p[1] + ny * 11], [p[0] - nx * 11, p[1] - ny * 11], 5, col);
+  };
+  // straight body line from the ankles at angle phi (degrees above horizontal)
+  const plank = (ax, ay, phi) => {
+    const p = rad(phi);
+    return {hip: [ax + 103 * Math.cos(p), ay - 103 * Math.sin(p)], t: 90 - phi, f: [ax, ay], f2: [ax - 6, ay], fa: 55, fa2: 55};
+  };
+  // straight line from the knees (shins flat on the floor) at angle phi
+  const kneePlank = (kx, ky, phi) => {
+    const p = rad(phi);
+    return {hip: [kx + 52 * Math.cos(p), ky - 52 * Math.sin(p)], t: 90 - phi, f: [kx - 52, ky], f2: [kx - 58, ky], fa: 172, fa2: 172};
+  };
+  // lateral band walk stance: left and right ankle x
+  const lw = (a, b) => { const cx = (a + b) / 2; return {c: [cx, 172], fl: [a, 254], fr: [b, 254], hl: [cx - 34, 154], hr: [cx + 34, 154]}; };
+
+  // ---------- pose handling ----------
+  function normSide(P) {
+    const o = Object.assign({h: 0, fa: 27, fa2: 27, lb: 1, ab: -1, as: 1}, P);
+    if (!o.f2) o.f2 = [o.f[0] - 8, o.f[1]];
+    if (o.hd && !o.hd2) o.hd2 = [o.hd[0] - 3, o.hd[1]];
+    if (o.arm && !o.arm2) o.arm2 = o.arm;
+    return o;
+  }
+  const normFront = P => Object.assign({ts: 1, bl: -1, br: 1, al: -1, ar: 1, as: 1, fo: 12, sx: 0, hx: 0, hy: 0}, P);
+  function mix(a, b, u) {
+    if (typeof a === "number") return lerp(a, b, u);
+    if (Array.isArray(a)) return a.map((v, i) => mix(v, b[i], u));
+    return a;
+  }
+  function mixPose(A, B, u) { const o = {}; for (const k in A) o[k] = (k in B) ? mix(A[k], B[k], u) : A[k]; return o; }
+  function poseOf(ex, st) {
+    const nm = (ex.v === "f" || ex.v === "r") ? normFront : normSide;
+    if (ex.seq) {
+      const n = ex.seq.length, A = nm(ex.seq[st.i]), B = nm(ex.seq[(st.i + 1) % n]), o = mixPose(A, B, st.s);
+      ["fl", "fr", "f", "f2"].forEach(k => {                 // lift whichever foot is stepping
+        if (A[k] && B[k] && Math.abs(A[k][0] - B[k][0]) > 2) o[k] = [o[k][0], o[k][1] - 7 * Math.sin(Math.PI * st.s)];
+      });
+      return o;
+    }
+    const o = mixPose(nm(ex.a), nm(ex.b), st.u);
+    if (ex.walk) {
+      const lift = 11 * Math.sin(Math.PI * st.u);
+      if (st.dir > 0) o.f2 = [o.f2[0], o.f2[1] - lift]; else o.f = [o.f[0], o.f[1] - lift];
+    }
+    return o;
+  }
+
+  // ---------- side view ----------
+  function solveSide(P) {
+    const hip = P.hip, th = rad(P.t), d = [Math.sin(th), -Math.cos(th)], nf = [Math.cos(th), Math.sin(th)];
+    const sh = [hip[0] + d[0] * L.to, hip[1] + d[1] * L.to];
+    const ht = rad(P.t + P.h), hdv = [Math.sin(ht), -Math.cos(ht)], hnf = [Math.cos(ht), Math.sin(ht)];
+    const head = [sh[0] + hdv[0] * (L.nk + L.hd), sh[1] + hdv[1] * (L.nk + L.hd)];
+    const legN = ik(hip, P.f, L.th, L.sh, P.lb), legF = ik(hip, P.f2, L.th, L.sh, P.lb);
+    const as = P.hab != null ? Math.max(0.03, Math.cos(rad(P.hab))) : P.as;   // arm swinging toward the viewer looks shorter
+    const armN = P.arm ? fk(sh, P.arm, dS, as) : ik(sh, P.hd, L.ua * as, L.fa * as, P.ab);
+    const armF = P.arm2 ? fk(sh, P.arm2, dS, as) : ik(sh, P.hd2, L.ua * as, L.fa * as, P.ab);
+    return {hip, sh, head, d, nf, hnf, legN, legF, armN, armF, P};
+  }
+  function anchorsSide(S) {
+    const al = (f, off) => [S.hip[0] + S.d[0] * L.to * f + S.nf[0] * off, S.hip[1] + S.d[1] * L.to * f + S.nf[1] * off];
+    return {
+      back: [[...al(0.68, -6), 22]], chest: [[...al(0.78, 7), 18]], core: [[...al(0.3, 8), 18]],
+      glute: [[...al(0, -8), 19]], thigh: [[...mid(S.hip, S.legN.j, 0.55), 20]],
+      arm: [[...mid(S.sh, S.armN.j, 0.5), 15]], lat: [[...al(0.6, 0), 24]], delt: [[S.sh[0], S.sh[1], 15]]
+    };
+  }
+  function drawSide(ex, P) {
+    const S = solveSide(P);
+    const toe = (e, a) => [e[0] + L.ft * Math.cos(rad(a)), e[1] + L.ft * Math.sin(rad(a))];
+    let o = "";
+    if (ex.pb) o += ex.pb(S);
+    o += pl([S.hip, S.legF.j, S.legF.e], 15, C.pantsF) + ln(S.legF.e, toe(S.legF.e, P.fa2), 9, "#5d5660");
+    o += pl([S.sh, S.armF.j, S.armF.e], 10, C.skinF) + ci(S.armF.e, 5, C.skinF);
+    o += ln(S.hip, S.sh, 30, C.shirt);
+    o += pl([S.hip, S.legN.j, S.legN.e], 16, C.pants) + ln(S.legN.e, toe(S.legN.e, P.fa), 10, C.shoe);
+    o += ci(S.hip, 13.5, C.pants);
+    const nearArm = pl([S.sh, S.armN.j, S.armN.e], 11, C.skin) + ci(S.armN.e, 5.5, C.skin);
+    const head = ln(S.sh, S.head, 10, C.skin) +
+      ci([S.head[0] - S.hnf[0] * 2.5, S.head[1] - S.hnf[1] * 2.5], 15.5, C.hair) +
+      ci([S.head[0] + S.hnf[0] * 2.5, S.head[1] + S.hnf[1] * 2.5], 13, C.skin);
+    o += P.armFront ? head + nearArm : nearArm + head;     // arms overhead pass in front of the head
+    if (ex.pf) o += ex.pf(S);
+    return {svg: o, anchors: anchorsSide(S)};
+  }
+
+  // ---------- front and rear views ----------
+  function solveFront(P) {
+    const c = P.c, s = P.ts, sc = [c[0] + P.sx, c[1] - L.to * s];
+    const SW = 22, HW = 12;
+    const hl = [c[0] - HW, c[1]], hr = [c[0] + HW, c[1]], sl = [sc[0] - SW, sc[1]], sr = [sc[0] + SW, sc[1]];
+    const head = [sc[0] + P.hx, sc[1] - (L.nk + L.hd) * (0.55 + 0.45 * s) + P.hy];
+    const lL = ik(hl, P.fl, L.th, L.sh, P.bl), lR = ik(hr, P.fr, L.th, L.sh, P.br);
+    const as = P.hab != null ? Math.max(0.03, Math.sin(rad(P.hab))) : P.as;
+    const aL = P.armL ? fk(sl, P.armL, dL, as) : ik(sl, P.hl, L.ua * as, L.fa * as, P.al);
+    const aR = P.armR ? fk(sr, P.armR, dR, as) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
+    return {c, sc, hl, hr, sl, sr, head, lL, lR, aL, aR, P};
+  }
+  function anchorsFront(S) {
+    return {
+      delt: [[S.sl[0], S.sl[1], 15], [S.sr[0], S.sr[1], 15]],
+      arm: [[...mid(S.sl, S.aL.j), 14], [...mid(S.sr, S.aR.j), 14]],
+      thigh: [[...mid(S.hl, S.lL.j, 0.55), 19], [...mid(S.hr, S.lR.j, 0.55), 19]],
+      hipj: [[S.hl[0] - 4, S.hl[1], 17], [S.hr[0] + 4, S.hr[1], 17]],
+      upperback: [[S.sc[0], S.sc[1] + 13, 27]]
+    };
+  }
+  function drawFR(ex, P, rear) {
+    const S = solveFront(P);
+    let o = "";
+    if (ex.pb) o += ex.pb(S);
+    o += pl([S.hl, S.lL.j, S.lL.e], 16, C.pants) + pl([S.hr, S.lR.j, S.lR.e], 16, C.pants);
+    o += ln(S.lL.e, [S.lL.e[0] - P.fo, S.lL.e[1] + 7], 10, C.shoe) + ln(S.lR.e, [S.lR.e[0] + P.fo, S.lR.e[1] + 7], 10, C.shoe);
+    o += `<polygon points="${f1(S.hl[0] - 4)},${f1(S.c[1] - 6)} ${f1(S.hr[0] + 4)},${f1(S.c[1] - 6)} ${f1(S.hr[0] + 4)},${f1(S.c[1] + 16)} ${f1(S.hl[0] - 4)},${f1(S.c[1] + 16)}" fill="${C.pants}" stroke="${C.pants}" stroke-width="6" stroke-linejoin="round"/>`;
+    const arms = pl([S.sl, S.aL.j, S.aL.e], 11, C.skin) + pl([S.sr, S.aR.j, S.aR.e], 11, C.skin) + ci(S.aL.e, 5.5, C.skin) + ci(S.aR.e, 5.5, C.skin);
+    const head = rear
+      ? ln(S.sc, S.head, 10, C.skin) + ci(S.head, 15.5, C.hair)                     // back of the head
+      : ln(S.sc, S.head, 10, C.skin) + ci([S.head[0], S.head[1] - 2], 15.5, C.hair) + ci([S.head[0], S.head[1] + 1.5], 13, C.skin);
+    const torso = `<polygon points="${f1(S.sl[0])},${f1(S.sl[1])} ${f1(S.sr[0])},${f1(S.sr[1])} ${f1(S.hr[0] + 2)},${f1(S.c[1])} ${f1(S.hl[0] - 2)},${f1(S.c[1])}" fill="${C.shirt}" stroke="${C.shirt}" stroke-width="12" stroke-linejoin="round"/>`;
+    if (P.headBehind) o += head;
+    if (P.armsBehind) { if (ex.pm) o += ex.pm(S); o += arms; }
+    o += torso;
+    if (!P.armsBehind) { if (ex.pm) o += ex.pm(S); o += arms; }
+    if (!P.headBehind) o += head;
+    if (ex.pf) o += ex.pf(S);
+    return {svg: o, anchors: anchorsFront(S)};
+  }
+
+  // ---------- exercises ----------
+  // a = start pose, b = finish pose (or seq = list of poses). ge = when the muscles work hardest (0 start, 1 finish, .5 always).
+  // tm = seconds [to finish, hold finish, back to start, hold start]; tl = on-screen cue for each of those phases.
+  const ANIM = {
+    "Goblet squat": {
+      a: {hip: [192, 152], t: 4, h: -4, f: [200, 254], hd: [214, 102]},
+      b: {hip: [160, 196], t: 32, h: -22, f: [200, 254], hd: [205, 152]},
+      pf: S => db(S.armN.e, 90), glow: ["thigh", "glute"], ge: 0.5,
+      tm: [2.4, 0.3, 1.2, 0.6], tl: ["Lower slowly (2–3 sec)", "", "Drive up through your heels", ""]
+    },
+    "Staggered-stance one-arm row": {
+      a: {hip: [180, 160], t: 62, h: -10, f: [156, 254], f2: [214, 254], hd: [236, 198], hd2: [205, 192]},
+      b: {hip: [180, 160], t: 62, h: -10, f: [156, 254], f2: [214, 254], hd: [222, 160], hd2: [205, 192]},
+      pf: S => db(S.armN.e, 0), glow: ["lat", "arm"], ge: 1,
+      tm: [1.0, 0.6, 2.0, 0.4], tl: ["Pull elbow toward your hip", "Squeeze", "Lower slowly", ""]
+    },
+    "Knee push-up": {
+      a: {...kneePlank(130, 254, 33), hd: [234, 258], h: 4},
+      b: {...kneePlank(130, 254, 7.2), hd: [234, 258], h: 4},
+      pb: () => mat(), glow: ["chest", "arm"], ge: 1,
+      tm: [2.2, 0.3, 1.1, 0.5], tl: ["Lower slowly, knees to head straight", "", "Push the floor away", ""]
+    },
+    "Band lat pulldown": {
+      a: {hip: [265, 202], t: -12, h: -6, f: [213, 254], f2: [207, 254], fa: 172, fa2: 172, hd: [289.7, 88.8], ab: -1, armFront: true},
+      b: {hip: [265, 202], t: -12, h: -6, f: [213, 254], f2: [207, 254], fa: 172, fa2: 172, hd: [268, 150], ab: -1, armFront: true},
+      pb: () => mat() + `<rect x="332" y="14" width="14" height="${G - 14}" fill="${C.wood}"/><rect x="326" y="18" width="10" height="12" rx="2" fill="${C.prop}"/>`,
+      pf: S => ln(S.armF.e, [331, 24], 4, C.band) + ln(S.armN.e, [331, 24], 4, C.band),
+      glow: ["lat", "back"], ge: 1,
+      tm: [1.0, 0.6, 2.0, 0.4], tl: ["Pull elbows down to your sides", "Squeeze shoulder blades down", "Let your arms rise slowly", ""]
+    },
+    "Dumbbell Romanian deadlift": {
+      a: {hip: [198, 153], t: 3, h: -3, f: [203, 254], hd: [210, 160]},
+      b: {hip: [164, 162], t: 72, h: -10, f: [203, 254], hd: [205, 212]},
+      pf: S => db(S.armN.e, 0), glow: ["glute", "thigh"], ge: 0.5,
+      tm: [2.4, 0.3, 1.3, 0.5], tl: ["Push hips back slowly", "", "Squeeze glutes to stand", ""]
+    },
+    "Overhead triceps extension": {
+      a: {hip: [198, 153], t: 0, f: [203, 254], arm: [170, 172], armFront: true},
+      b: {hip: [198, 153], t: 0, f: [203, 254], arm: [170, 335], armFront: true},
+      pf: S => db([S.armN.e[0], S.armN.e[1] + 14], 90), glow: ["arm"], ge: 0.5,
+      tm: [2.2, 0.3, 1.1, 0.5], tl: ["Lower behind your head slowly", "", "Straighten, elbows stay still", ""]
+    },
+    "Plank": {
+      a: {...plank(70, 246, 11.2), hd: [266, 252], h: 6},
+      b: {...plank(70, 246, 10.2), hd: [266, 252], h: 6},
+      pb: () => mat(), glow: ["core"], ge: 0.5,
+      tm: [2.5, 0, 2.5, 0], tl: ["Hold, keep breathing", "Hold, keep breathing", "Hold, keep breathing", "Hold, keep breathing"]
+    },
+    "Reverse lunge": {
+      a: {hip: [212, 153], t: 3, f: [215, 254], f2: [208, 254], hd: [216, 158]},
+      b: {hip: [178, 200], t: 4, f: [215, 254], f2: [122, 238], fa2: 60, hd: [182, 205]},
+      pf: S => db(S.armN.e, 0), glow: ["glute", "thigh"], ge: 0.5,
+      tm: [2.0, 0.3, 1.2, 0.6], tl: ["Step back and lower", "", "Push through your front heel", ""]
+    },
+    "Bent-over two-arm dumbbell row": {
+      a: {hip: [165, 157], t: 60, h: -10, f: [188, 254], f2: [180, 254], hd: [216, 192]},
+      b: {hip: [165, 157], t: 60, h: -10, f: [188, 254], f2: [180, 254], hd: [205, 155]},
+      pf: S => db(S.armF.e, 0, 1.05) + db(S.armN.e, 0), glow: ["lat"], ge: 1,
+      tm: [1.0, 0.6, 2.0, 0.4], tl: ["Pull elbows back", "Squeeze", "Lower slowly", ""]
+    },
+    "Glute bridge with band": {
+      a: {hip: [262, 248], t: -90, h: 0, f: [300, 254], hd: [258, 254], ab: 1},
+      b: {hip: [256.8, 223.6], t: -114, h: 24, f: [300, 254], hd: [258, 254], ab: 1},
+      pb: () => mat(), pf: S => ring(S.hip, S.legN.j, 0.9, C.band), glow: ["glute"], ge: 1,
+      tm: [1.1, 1.0, 2.0, 0.4], tl: ["Lift hips", "Squeeze 1 sec, no arching", "Lower slowly", ""]
+    },
+    "Close-grip floor press": {
+      a: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [175, 178]},
+      b: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [80, 180]},
+      pb: () => mat(), pf: S => db(S.armN.e, 0), glow: ["arm", "chest"], ge: 1,
+      tm: [2.2, 0.3, 1.1, 0.5], tl: ["Lower slowly, elbows tucked", "", "Press up", ""]
+    },
+    "Dead bug": {
+      a: {hip: [262, 248], t: -90, h: 0, f: [314, 196], f2: [306, 196], fa: -75, fa2: -75, hd: [202, 181], hd2: [199, 181], ab: 1},
+      b: {hip: [262, 248], t: -90, h: 0, f: [366, 238], f2: [306, 196], fa: -75, fa2: -75, hd: [202, 181], hd2: [136, 238], ab: 1},
+      pb: () => mat(), glow: ["core"], ge: 0.5,
+      tm: [2.2, 0.4, 2.0, 0.6], tl: ["Reach out slowly, back flat", "", "Return", ""]
+    },
+    "Dumbbell pullover": {
+      a: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [180, 188]},
+      b: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [262, 270]},
+      pb: () => mat(),
+      pf: S => { const e = S.armN.e, a = rad(angOf(S.armN.j, e)); return db([e[0] + Math.cos(a) * 9, e[1] + Math.sin(a) * 9], a * 180 / Math.PI); },
+      glow: ["lat"], ge: 0.5,
+      tm: [2.4, 0.3, 1.4, 0.4], tl: ["Lower behind your head slowly", "", "Pull back over your chest", ""]
+    },
+    "Close-grip push-up": {
+      a: {...plank(75, 246, 18.9), hd: [230, 258], h: 4},
+      b: {...plank(75, 246, 6), hd: [230, 258], h: 4},
+      pb: () => mat(), glow: ["arm", "chest"], ge: 1,
+      tm: [2.2, 0.3, 1.1, 0.5], tl: ["Lower slowly, elbows tucked", "", "Push up", ""]
+    },
+    "Farmer's march": {
+      seq: [
+        {hip: [200, 152], t: 0, f: [206, 254], f2: [198, 254], hd: [203, 160], hd2: [197, 160]},
+        {hip: [200, 152], t: 0, f: [220, 222], f2: [198, 254], hd: [203, 160], hd2: [197, 160]},
+        {hip: [200, 152], t: 0, f: [206, 254], f2: [198, 254], hd: [203, 160], hd2: [197, 160]},
+        {hip: [200, 152], t: 0, f: [206, 254], f2: [212, 222], hd: [203, 160], hd2: [197, 160]}
+      ], segT: 0.5, segH: 0.1,
+      pf: S => db(S.armF.e, 0, 1.05) + db(S.armN.e, 0), glow: ["lat", "core"],
+      tl: ["March in place, stand tall", "March in place, stand tall", "March in place, stand tall", "March in place, stand tall"]
+    },
+
+    // ---- rear view (so the upper-back muscles are visible) with a small side-view inset ----
+    "Band pull-apart": {
+      v: "r",
+      a: {c: [200, 150], fl: [184, 254], fr: [216, 254], armL: [92, 92], armR: [92, 92], hab: 10, armsBehind: true},
+      b: {c: [200, 150], fl: [184, 254], fr: [216, 254], armL: [92, 92], armR: [92, 92], hab: 90, armsBehind: true},
+      pm: S => ln(S.aL.e, S.aR.e, 4, C.band), glow: ["upperback", "delt"], ge: 1,
+      inset: {a: {hip: [198, 153], t: 0, f: [203, 254], arm: [90, 90], hab: 10},
+              b: {hip: [198, 153], t: 0, f: [203, 254], arm: [90, 90], hab: 90}},
+      tm: [1.0, 0.8, 1.8, 0.4], tl: ["Pull apart, arms straight", "Squeeze shoulder blades", "Return slowly", ""]
+    },
+    "Reverse fly": {
+      v: "r",
+      a: {c: [200, 150], ts: 0.3, fl: [184, 254], fr: [216, 254], armL: [0, -10], armR: [0, -10], headBehind: true, hy: 12},
+      b: {c: [200, 150], ts: 0.3, fl: [184, 254], fr: [216, 254], armL: [88, 78], armR: [88, 78], headBehind: true, hy: 12},
+      pf: S => dbEnd(S.aL.e) + dbEnd(S.aR.e), glow: ["upperback", "delt"], ge: 1,
+      inset: {a: {hip: [165, 155], t: 70, h: -10, f: [188, 254], arm: [0, 0], hab: 0},
+              b: {hip: [165, 155], t: 70, h: -10, f: [188, 254], arm: [0, 0], hab: 88},
+              pf: S => db(S.armN.e, 0)},
+      insetAt: [262, 24],
+      tm: [1.1, 0.8, 2.0, 0.4], tl: ["Raise out to the sides", "Squeeze", "Lower slowly", ""]
+    },
+
+    // ---- front view ----
+    "Dumbbell overhead press": {
+      v: "f",
+      a: {c: [200, 150], fl: [184, 254], fr: [216, 254], hl: [166, 86], hr: [234, 86], al: 1, ar: -1},
+      b: {c: [200, 150], fl: [184, 254], fr: [216, 254], hl: [174, 24], hr: [226, 24], al: 1, ar: -1},
+      pf: S => db(S.aL.e, 0, 1) + db(S.aR.e, 0, 1), glow: ["delt", "arm"], ge: 1,
+      tm: [1.2, 0.4, 2.0, 0.4], tl: ["Press up", "", "Lower slowly", ""]
+    },
+    "Sumo goblet squat": {
+      v: "f",
+      a: {c: [200, 158], fl: [150, 254], fr: [250, 254], hl: [197, 162], hr: [203, 162], fo: 16, al: 1, ar: -1},
+      b: {c: [200, 206], fl: [150, 254], fr: [250, 254], hl: [197, 210], hr: [203, 210], fo: 16, al: 1, ar: -1},
+      pf: S => db([(S.aL.e[0] + S.aR.e[0]) / 2, S.aL.e[1] + 9], 90), glow: ["thigh", "hipj"], ge: 0.5,
+      tm: [2.4, 0.3, 1.2, 0.6], tl: ["Lower slowly, knees out", "", "Stand up and squeeze", ""]
+    },
+    "Lateral band walk": {
+      v: "f",
+      seq: [lw(150, 196), lw(150, 242), lw(196, 242), lw(150, 242)], segT: 0.8, segH: 0.25,
+      pf: S => ln(S.lL.j, S.lR.j, 5, C.bandR), glow: ["hipj"],
+      tl: ["Step out", "Other foot follows, band stays tight", "Step out", "Other foot follows, band stays tight"]
+    }
+  };
+
+  // ---------- timeline ----------
+  function stateAt(ex, sec) {
+    const tl = ex.tl || ["", "", "", ""];
+    if (ex.seq) {
+      const n = ex.seq.length, per = ex.segT + ex.segH, t = sec % (n * per), i = Math.floor(t / per);
+      const s = (t - i * per) / ex.segT;
+      return {seq: true, i, s: s >= 1 ? 1 : ease(s), label: tl[i] || ""};
+    }
+    const [t1, h1, t2, h2] = ex.tm || [1.3, 0.4, 1.3, 0.4];
+    let t = sec % (t1 + h1 + t2 + h2);
+    if (t < t1) return {u: ease(t / t1), dir: 1, label: tl[0]};
+    t -= t1; if (t < h1) return {u: 1, dir: 1, label: tl[1]};
+    t -= h1; if (t < t2) return {u: 1 - ease(t / t2), dir: -1, label: tl[2]};
+    return {u: 0, dir: -1, label: tl[3]};
+  }
+
+  // ---------- rendering ----------
+  function compose(key, st) {
+    const ex = ANIM[key];
+    const P = poseOf(ex, st);
+    const r = (ex.v === "f" || ex.v === "r") ? drawFR(ex, P, ex.v === "r") : drawSide(ex, P);
+    const u = st.seq ? 0.5 : st.u;
+    const eff = (ex.seq || ex.ge == null || ex.ge === 0.5) ? 0.5 : (ex.ge === 1 ? u : 1 - u);
+    const op = f1(0.2 + 0.6 * eff);
+    let g = "";
+    (ex.glow || []).forEach(n => (r.anchors[n] || []).forEach(a => {
+      g += `<circle cx="${f1(a[0])}" cy="${f1(a[1])}" r="${a[2]}" fill="url(#gl)" opacity="${op}"/>`;
+    }));
+    let inset = "";
+    if (ex.inset) {
+      const ri = drawSide(ex.inset, poseOf(ex.inset, st));
+      const at = ex.insetAt || [262, 168];
+      inset = `<text x="${at[0] + 2}" y="${at[1] - 5}" font-size="11" font-weight="600" fill="#7a6f68" font-family="-apple-system,Segoe UI,Roboto,sans-serif">Side view</text>` +
+        `<g transform="translate(${at[0]} ${at[1]}) scale(0.28)"><rect width="400" height="290" rx="30" fill="#fff" stroke="#e2d6cc" stroke-width="6"/>` +
+        `<line x1="10" x2="390" y1="${G}" y2="${G}" stroke="#d3c5ba" stroke-width="5"/>${ri.svg}</g>`;
+    }
+    const label = st.label ? `<text x="30" y="30" font-size="14" font-weight="700" fill="#7a6f68" font-family="-apple-system,Segoe UI,Roboto,sans-serif">${st.label}</text>` : "";
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 8 360 272" role="img"><defs><radialGradient id="gl"><stop offset="0" stop-color="#ff3b2f" stop-opacity=".9"/><stop offset="55%" stop-color="#ff5a3c" stop-opacity=".4"/><stop offset="100%" stop-color="#ff5a3c" stop-opacity="0"/></radialGradient></defs>` +
+      `<rect width="400" height="290" fill="${C.bg}"/><rect y="${G}" width="400" height="28" fill="${C.floor}"/><line x1="0" x2="400" y1="${G}" y2="${G}" stroke="#d3c5ba" stroke-width="2"/>` +
+      r.svg + g + inset + label + `</svg>`;
+  }
+  // render at a movement fraction u (0 = start pose, 1 = finish pose); used for testing
+  function render(key, u, dir) {
+    const ex = ANIM[key];
+    if (!ex) return "";
+    if (ex.seq) { const n = ex.seq.length, x = Math.min(u, 0.9999) * n, i = Math.floor(x); return compose(key, {seq: true, i, s: x - i, label: ""}); }
+    return compose(key, {u, dir: dir == null ? 1 : dir, label: ""});
+  }
+  const renderAt = (key, sec) => compose(key, stateAt(ANIM[key], sec));
+
+  function mount(el, key) {
+    let raf = 0, playing = true, elapsed = 0, last = null;
+    function frame(ts) {
+      if (last !== null && playing) elapsed += (ts - last) / 1000;
+      last = ts;
+      el.innerHTML = renderAt(key, elapsed);
+      raf = requestAnimationFrame(frame);
+    }
+    el.innerHTML = renderAt(key, 0);
+    raf = requestAnimationFrame(frame);
+    return {
+      toggle() { playing = !playing; return playing; },
+      isPlaying() { return playing; },
+      destroy() { cancelAnimationFrame(raf); }
+    };
+  }
+
+  return {render, renderAt, mount, keys: Object.keys(ANIM), ANIM};
+})();

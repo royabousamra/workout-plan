@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My 3-Day Strength Plan</title>
+<style>
+  :root{
+    --bg:#faf7f4; --card:#fff; --ink:#2b2420; --muted:#7a6f68; --line:#eadfd7;
+    --accent:#c4553a; --accent-d:#a8452d; --soft:#fbece7; --ok:#2f7d52; --okbg:#e6f3ec; --note:#fff6df; --noteline:#efd9a0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:620px;margin:0 auto;padding:20px 16px 56px}
+  h1{font-size:27px;margin:8px 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px}
+  .days{display:grid;gap:12px}
+  .day{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;text-align:left;cursor:pointer;font:inherit;color:inherit;transition:transform .08s,border-color .15s}
+  .day:hover{border-color:var(--accent)} .day:active{transform:scale(.99)}
+  .day .k{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .day .t{font-size:19px;font-weight:700;margin:2px 0}
+  .day .m{color:var(--muted);font-size:14px}
+  details.info{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-top:16px}
+  details.info summary{cursor:pointer;font-weight:700}
+  details.info ul{margin:10px 0 0;padding-left:20px} details.info li{margin-bottom:6px}
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .link{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:6px 0}
+  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:6px}
+  .bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+  .count{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+  .label{display:inline-block;background:var(--ink);color:#fff;border-radius:8px;padding:1px 9px;font-weight:700;font-size:14px;margin-bottom:6px}
+  .card h2{margin:0 0 4px;font-size:24px}
+  .pair{font-size:14px;color:var(--muted);margin-bottom:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .chip{background:var(--soft);color:var(--accent-d);border-radius:99px;padding:3px 10px;font-size:13px;font-weight:600}
+  .chip.dose{background:var(--accent);color:#fff}
+  .photos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+  .photos figure{margin:0}
+  .photos img{width:100%;border-radius:10px;display:block;background:#eee}
+  .photos figcaption{font-size:12px;color:var(--muted);text-align:center;margin-top:3px}
+  .photonote{font-size:13px;background:var(--note);border:1px solid var(--noteline);border-radius:10px;padding:8px 10px;margin:8px 0 14px}
+  h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 6px}
+  .cues{margin:0;padding-left:20px} .cues li{margin-bottom:6px}
+  .easier{font-size:14.5px;background:var(--okbg);border-radius:10px;padding:9px 12px;margin-top:12px}
+  .sets{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .sets button{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;min-width:84px}
+  .sets button.on{background:var(--ok);border-color:var(--ok);color:#fff}
+  .video{display:inline-block;margin-top:14px;font-weight:600;color:var(--accent);text-decoration:none}
+  .video:hover{text-decoration:underline}
+  .nav{display:flex;gap:10px;margin-top:16px}
+  .btn{flex:1;border:0;border-radius:14px;padding:14px;font:inherit;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#fff;flex:2} .btn.primary:hover{background:var(--accent-d)}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .done{text-align:center;padding:36px 18px}
+  .done h2{font-size:26px;margin:0 0 8px}
+  .rest{font-size:13px;color:var(--muted);text-align:center;margin-top:10px}
+  .foot{font-size:12.5px;color:var(--muted);margin-top:22px}
+  .tabs{display:flex;gap:6px;margin:4px 0 10px}
+  .tab{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:8px;font:inherit;font-weight:700;cursor:pointer;color:var(--muted)}
+  .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .anim{border-radius:14px;overflow:hidden;border:1px solid var(--line);cursor:pointer;line-height:0;user-select:none}
+  .anim svg{width:100%;height:auto;display:block}
+  .legend{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:12px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff4a3a;opacity:.7;margin-right:4px;vertical-align:-1px}
+  .board{font-size:14.5px;background:#eef3fb;border:1px solid #cfdcf1;border-radius:10px;padding:9px 12px;margin-top:10px}
+  .vcard{display:flex;gap:12px;align-items:center;margin-top:16px;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius:14px;padding:8px}
+  .vcard:hover{border-color:var(--accent)}
+  .vthumb{position:relative;flex:0 0 132px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#2b2420}
+  .vthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .vthumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+  .vtxt b{display:block} .vtxt small{color:var(--muted)}
+  .more{display:inline-block;margin-top:8px;font-size:13px;color:var(--muted)}
+  .boardimg{width:100%;border-radius:10px;margin-top:10px;display:block}
+  .dayname{font-size:12.5px;color:var(--muted)}
+  .topnav{display:none}
+  .vrow{display:block}
+  @media (min-width: 900px){
+    .wrap{max-width:1200px;padding:14px 28px 20px}
+    h1{font-size:30px}
+    .days{grid-template-columns:repeat(3,1fr)}
+    .info-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+    .top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:8px}
+    .dayname{text-align:center;font-size:14px;font-weight:700;color:var(--ink)}
+    .topnav{display:flex;gap:8px;justify-self:end}
+    .topnav .btn{flex:none;padding:9px 24px;border-radius:11px}
+    #nav,#rest{display:none!important}
+    .count{margin-bottom:10px}
+    .card{padding:18px 24px}
+    .card.split{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:30px;align-items:start}
+    .card.warmcard{max-width:720px;margin:0 auto}
+    .card.done{max-width:520px;margin:0 auto}
+    .colR h2{font-size:27px}
+    .colR .pair{margin-bottom:8px}
+    .colR .chips{margin-bottom:4px}
+    .colR h3{margin:14px 0 6px}
+    .colR .cues li{margin-bottom:4px}
+    .colR .easier,.colR .board{margin-top:10px;padding:8px 12px}
+    .colL .tabs{margin-top:0}
+    .card.split{overflow:hidden}
+    .anim,.legend{margin-left:auto;margin-right:auto}
+    .photos img{object-fit:contain}
+    .titlerow{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+    .titlerow .label{margin-bottom:0}
+    .titlerow h2{margin:0}
+    .tips{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .tips > *{margin-top:0!important}
+    .tips > :only-child{grid-column:1/-1}
+    .setrow{display:flex;align-items:center;gap:14px;margin-top:12px}
+    .setrow h3{margin:0;white-space:nowrap}
+    .setrow .sets{margin-top:0}
+    .setrow .sets button{padding:8px 14px;min-width:76px}
+    .vrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+    .vrow .vcard{margin-top:0;flex:1;padding:6px}
+    .vrow .vthumb{flex-basis:104px}
+    .vrow .more{margin-top:0;flex:none}
+  }
+  @media (min-width: 1500px){ .wrap{max-width:1480px} }
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="home">
+    <h1>My 3-Day Strength Plan</h1>
+    <p class="sub">Full-body workouts for back, arms and legs. No bench or table needed, and a mat-sized space is enough. Pick today's workout (for example Mon / Wed / Fri).</p>
+    <div class="days" id="days"></div>
+
+    <div class="info-row">
+    <details class="info" open>
+      <summary>How to run each workout</summary>
+      <ul>
+        <li><b>Pairs:</b> exercises with the same number (1A and 1B) are done back to back. Do A, rest 30 seconds, do B, then rest 60–90 seconds. Repeat for all sets.</li>
+        <li><b>Weeks 1–2:</b> do only 2 sets of each exercise with light weights. Learn the moves first. Some soreness is normal.</li>
+        <li><b>Picking weight:</b> choose one where the last 2–3 reps feel hard but your form stays clean.</li>
+        <li><b>Moving up:</b> when you hit the top rep number on every set, use heavier dumbbells or a thicker band.</li>
+        <li><b>Off days:</b> a 20–30 minute walk helps fat loss and recovery.</li>
+      </ul>
+    </details>
+    <details class="info">
+      <summary>Using your band platform</summary>
+      <img class="boardimg" alt="Your wooden resistance band platform" src="BOARD_IMG_URI">
+      <ul>
+        <li>The platform is optional. Start with the dumbbell versions, and bring in the platform when you want more resistance or your dumbbells feel too light.</li>
+        <li>Stand on it, attach a band the way the platform's instructions describe, and hold the handles or bar.</li>
+        <li>Exercises with a blue "Platform option" box can be done this way.</li>
+        <li>Check bands for nicks or wear before each use.</li>
+        <li><b>Door anchor:</b> use the top of a door that opens away from you, close it fully, and tug-test it before each set.</li>
+      </ul>
+    </details>
+    </div>
+    <p class="foot">Animated demos are drawn for this plan. The real photos are from the <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> project (public domain). Video links open YouTube and need internet. If anything hurts (not just burns), stop and check with a doctor or trainer.</p>
+  </section>
+
+  <section id="player" hidden>
+    <div class="top">
+      <button class="link" id="back-home">&larr; All days</button>
+      <span class="dayname" id="day-name"></span>
+      <div class="topnav" id="topnav"><button class="btn ghost" id="prevT">Back</button><button class="btn primary" id="nextT">Next</button></div>
+    </div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="count" id="count"></div>
+
+    <div class="card" id="card"></div>
+
+    <div class="card done" id="done" hidden>
+      <h2>Workout done 🎉</h2>
+      <p class="sub">Nice work. Do a gentle stretch and drink some water.</p>
+      <button class="btn primary" id="done-home" style="width:100%">Back to all days</button>
+    </div>
+
+    <div class="nav" id="nav">
+      <button class="btn ghost" id="prev">Back</button>
+      <button class="btn primary" id="next">Next</button>
+    </div>
+    <div class="rest" id="rest">Tip: left and right arrow keys move between exercises.</div>
+  </section>
+
+</div>
+
+<script>
+/*IMG_DATA*/
+
+/*FIG_JS*/
+
+// Exercise library. img = photo set id, cues in plain language, easier = a way to make it doable now.
+const EX = {
+  "Goblet squat": {img:"Goblet_Squat", vq:"goblet squat form beginner", vid:"zsN2WvklwDk", board:"Stand on the platform with a band set up so it stays tight, and hold the band handles at your shoulders instead of the dumbbell for a banded squat.", focus:["Quads","Glutes","Core","Upper back"],
+    photo:"The photo shows a kettlebell. A dumbbell held upright at your chest is the same move.",
+    cues:["Hold one dumbbell upright against your chest with both hands.","Feet a bit wider than shoulders, toes turned out slightly.","Sit down between your knees with your chest up and weight in your heels.","Go as low as feels comfortable, then push the floor away to stand."],
+    easier:"Squat to the edge of your couch or bed and lightly tap it each rep, or hold a door frame for balance."},
+  "Staggered-stance one-arm row": {img:"Bent_Over_Two-Dumbbell_Row_With_Palms_In", vq:"staggered stance single arm dumbbell row", vid:"rz8dldEHc5c", board:"Stand on the platform with a band set under it, hinge forward, and row one band handle toward your hip.", focus:["Lats","Mid-back","Rear delts","Biceps","Core"],
+    photo:"The photo shows a two-arm row. For this one, step one foot forward, brace your free hand on that thigh, and row with the other arm. No bench needed.",
+    cues:["Step your left foot forward and hinge at the hips until your back is flat and tilted well forward. Rest your left hand on your left thigh.","Let the dumbbell hang from your right hand, under your shoulder.","Pull your elbow toward your back pocket and squeeze your shoulder blade toward your spine for 1 second.","Lower slowly. Keep hips and shoulders square (no twisting). Switch sides after the set."],
+    easier:"Use a lighter dumbbell and pause at the top. Quality beats weight here."},
+  "Knee push-up": {img:"Pushups", vq:"knee push up proper form", vid:"utzhPQuXWcA", focus:["Chest","Shoulders","Triceps","Core"],
+    photo:"The photo shows a full push-up on the toes. Do the same movement with your knees on the floor (a folded towel under them helps).",
+    cues:["Hands a little wider than your shoulders, knees on the floor behind you.","Make one straight line from your knees to your head. Squeeze your abs and glutes so your hips don't sag or pike.","Lower your chest toward the floor between your hands, elbows about 45° from your sides.","Press the floor away until your arms are straight."],
+    easier:"Wall push-ups: hands on a wall at chest height, feet stepped back, same movement. Move to knee push-ups once you can do 15 clean wall reps."},
+  "Band lat pulldown": {img:"Kneeling_High_Pulley_Row", vq:"kneeling resistance band lat pulldown door anchor", vid:"gebMl23Fw_4", focus:["Lats (under the bra line)","Mid-back","Rear delts","Biceps"],
+    photo:"The photo uses a gym cable. At home, a long band clipped into your over-the-door anchor at the top of the door does the same job.",
+    cues:["Set the anchor at the top of a door that opens away from you, close it fully (lock it if you can), and test it with a firm tug.","Kneel facing the door, about 2 feet back. Hold the band ends or handles with arms reaching up toward the anchor and a little tension on the band.","Chest up, lean back very slightly. Pull your elbows down to your sides until your hands reach upper-chest height.","Squeeze your shoulder blades down for 1 second, then let your arms rise slowly."],
+    easier:"Kneel closer to the door or use a lighter band. Use a long band (a tube band with handles or a big loop band). Small mini loops are too short for this one."},
+  "Dumbbell Romanian deadlift": {img:"Stiff-Legged_Dumbbell_Deadlift", vq:"dumbbell romanian deadlift form", vid:"KYIJdN2gBmQ", board:"Stand on the platform with a band set under it, hold the band handles in front of your thighs, and hinge back against the band.", focus:["Hamstrings","Glutes","Lower back"],
+    photo:null,
+    cues:["Hold the dumbbells in front of your thighs, knees slightly bent.","Push your hips straight back, like closing a car door with your butt.","Slide the dumbbells down your legs to about mid-shin. Keep your back flat.","Squeeze your glutes to stand tall. Your knees don't bend more as you go down."],
+    easier:"Go only as low as you can keep your back flat. Use light weights at first."},
+  "Overhead triceps extension": {img:"Standing_Dumbbell_Triceps_Extension", vq:"overhead dumbbell triceps extension form", vid:"xbNm9fRoUTw", board:"Stand on the platform with a band set under it, hold the band overhead in both hands, and straighten your arms against it.", focus:["Triceps (back of arm)"],
+    photo:null,
+    cues:["Hold one dumbbell with both hands, cupped under the top end, and press it overhead.","Keep your upper arms close to your ears with elbows pointing forward.","Bend only at the elbows to lower the weight behind your head.","Straighten your arms to lift it back up. Keep your ribs down so your back doesn't arch."],
+    easier:"Do it kneeling tall on the floor with a lighter weight."},
+  "Plank": {img:"Plank", vq:"plank form beginner", vid:"mwlp75MS6Rg", focus:["Core"], cap:["Hold","Hold"],
+    photo:null,
+    cues:["Forearms on the floor with elbows under your shoulders.","Make one straight line from head to heels.","Squeeze your abs and glutes. Don't let your hips sag or lift.","Keep breathing. Stop when your form breaks."],
+    easier:"Plank on your knees, keeping a straight line from knees to head."},
+
+  "Reverse lunge": {img:"Dumbbell_Rear_Lunge", vq:"dumbbell reverse lunge form", vid:"MyqQRJ2lW7Q", focus:["Quads","Glutes","Balance"],
+    photo:"Start with no dumbbells until your balance feels solid.",
+    cues:["Stand tall, then step one foot back about two feet.","Lower until your front thigh is close to parallel with the floor. Your back knee hovers above the ground.","Keep your torso upright and your front knee over your ankle.","Push through the front heel to stand, then switch legs."],
+    easier:"Hold a wall or door frame for balance and take a shallower range."},
+  "Bent-over two-arm dumbbell row": {img:"Bent_Over_Two-Dumbbell_Row", vq:"bent over dumbbell row form", vid:"fFmwY2dA2ds", board:"Stand on the platform with a band set under it, hold both handles, hinge forward, and row to your hips.", focus:["Lats","Mid-back","Rear delts","Biceps"],
+    photo:null,
+    cues:["Soft knees, hinge at the hips until your torso is leaning well forward with a flat back.","Let the dumbbells hang straight down. Look at the floor a few feet ahead.","Pull your elbows back toward your hips and squeeze your shoulder blades.","Lower slowly. Don't swing."],
+    easier:"Do the staggered-stance one-arm version with your free hand braced on your thigh."},
+  "Dumbbell overhead press": {img:"Dumbbell_Shoulder_Press", vq:"dumbbell shoulder press form", vid:"guW_ENwLOMI", board:"Stand on the platform with a band set under it and press the handles overhead.", focus:["Shoulders","Triceps","Core"],
+    photo:"The photo is seated. Do it standing, feet hip-width apart, glutes squeezed.",
+    cues:["Start with the dumbbells at shoulder height, palms facing forward.","Keep your ribs down and your core tight so your lower back doesn't arch.","Press up until your arms are almost straight. Don't lock your elbows.","Lower back to about ear level with control."],
+    easier:"Use very light dumbbells or press one arm at a time."},
+  "Glute bridge with band": {img:"Butt_Lift_Bridge", vq:"glute bridge with resistance band above knees", vid:"91uayvdKAQY", focus:["Glutes","Outer hips","Hamstrings"],
+    photo:"The photo shows the bridge without a band. Add your loop band just above your knees and press your knees gently outward.",
+    cues:["Lie on your back, knees bent, feet about hip-width, band above your knees.","Drive through your heels and lift your hips until your body is a straight line from knees to shoulders.","Squeeze your glutes for 1 second at the top. Don't arch your lower back.","Lower slowly. Once it's easy, rest a dumbbell across your hips."],
+    easier:"Skip the band for the first week and focus on squeezing your glutes."},
+  "Reverse fly": {img:"Reverse_Flyes", vq:"dumbbell reverse fly form", vid:"W_hNkKhtSJg", board:"Stand on the platform with a band set under it, hinge forward, and pull the handles out to the sides.", focus:["Rear delts","Upper back"],
+    photo:"The photo shows lying chest-down on an incline bench. At home, hinge forward with a flat back instead, like the side view in the animation.",
+    cues:["Use very light dumbbells (start with 2–5 lb).","Arms hang with a slight bend in the elbows.","Lift your arms out to the sides to shoulder height, squeezing your shoulder blades together.","Lower slowly. Don't swing your body."],
+    easier:"Do it with no weight at first to feel the muscles between your shoulder blades."},
+  "Close-grip floor press": {img:"Dumbbell_Floor_Press", vq:"close grip dumbbell floor press", vid:"AOGkkhMhebQ", focus:["Triceps (back of arm)","Chest","Shoulders"],
+    photo:"The photo shows a regular floor press. For the close-grip version, hold the dumbbells with palms facing each other and keep your elbows close to your sides.",
+    cues:["Lie on your back with knees bent and feet flat. Hold a dumbbell in each hand above your chest, palms facing each other.","Lower slowly until your upper arms touch the floor, elbows tucked about 45° from your body.","Pause lightly, then press straight up until your arms are straight.","Keep your wrists stacked over your elbows the whole time."],
+    easier:"Use lighter dumbbells, or hold one dumbbell with both hands."},
+  "Dead bug": {img:"Dead_Bug", vq:"dead bug exercise form", vid:"bxn9FBrt4-A", focus:["Deep core"],
+    photo:null,
+    cues:["Lie on your back, arms pointing at the ceiling, hips and knees bent at 90°.","Press your lower back into the floor and keep it there.","Slowly lower the opposite arm and leg toward the floor.","Return to the start and switch sides."],
+    easier:"Move only your legs, keeping your arms pointed up."},
+
+  "Sumo goblet squat": {img:"Plie_Dumbbell_Squat", vq:"sumo goblet squat form", vid:"NGDJPdDqK_k", focus:["Glutes","Inner thighs","Quads"],
+    photo:null,
+    cues:["Feet wide, toes turned out about 45°. Hold one dumbbell hanging in front of you.","Lower straight down with your chest tall and knees tracking over your toes.","Go to parallel or as low as is comfortable.","Squeeze your glutes and inner thighs to stand."],
+    easier:"Use bodyweight and a smaller range first."},
+  "Close-grip push-up": {img:"Push-Ups_-_Close_Triceps_Position", vq:"close grip push up form", vid:"aWixj7ey758", focus:["Triceps","Chest","Shoulders","Core"],
+    photo:"The photo shows the full version on the toes. Do it on your knees until you can do 8–12 clean reps.",
+    cues:["Hands directly under your shoulders or just inside them.","Elbows brush your ribs. Don't flare them out.","Lower your chest between your hands, body in one straight line.","Press back up and squeeze your triceps."],
+    easier:"Knees on the floor, or hands on a wall."},
+  "Lateral band walk": {img:"Monster_Walk", vq:"lateral band walk form", vid:"PhNkkOieB-8", focus:["Glutes","Outer hips"], cap:["Setup","Walk"],
+    photo:"The photo shows a forward and backward walk with a band. For this move, take the same stance and step sideways instead.",
+    cues:["Loop band just above your knees (or around your ankles for more challenge).","Sit into a small quarter-squat with toes pointing forward.","Step sideways, keeping tension on the band. Don't let your feet touch.","Short on space? Take 3–4 steps one way, then 3–4 back, and repeat until you reach 15 per side."],
+    easier:"Use a lighter band and take smaller steps."},
+  "Farmer's march": {img:"Farmers_Walk", vq:"farmers carry march in place dumbbells", vid:"T8CUVlNGlK4", focus:["Grip","Upper back","Core","Legs"], cap:["Pick up","Hold"],
+    photo:"The photo shows a walking carry. Marching in place works the same muscles and fits in a small space.",
+    cues:["Pick up a dumbbell in each hand by bending your knees and hips, not rounding your back.","Stand tall: shoulders back and down, ribs down, eyes forward.","March in place, lifting one knee at a time. Don't lean or let the weights swing.","Keep breathing. Put the weights down the same way you picked them up."],
+    easier:"Use lighter dumbbells, march slowly, or just hold the weights while standing tall."}
+};
+
+const WARM = {warm:true, title:"Warm-up (5 minutes)", cues:[
+  "March in place for 1–2 minutes.",
+  "Do 10 arm circles forward and 10 backward.",
+  "Do 10 slow bodyweight squats.",
+  "Do 10 light band pull-aparts.",
+  "Do 5 cat-cow stretches on hands and knees."]};
+
+// The plan. "sets" is the count shown as check buttons.
+const DAYS = [
+  {key:"Day 1", title:"Full body A", sub:"Squat, row, push, hinge, arms", steps:[
+    {label:"1A", ex:"Goblet squat", dose:"3 × 10–12", sets:3, with:"1B"},
+    {label:"1B", ex:"Staggered-stance one-arm row", dose:"3 × 10–12 per side", sets:3, with:"1A"},
+    {label:"2A", ex:"Knee push-up", dose:"3 × 6–12", sets:3, with:"2B"},
+    {label:"2B", ex:"Dumbbell Romanian deadlift", dose:"3 × 10–12", sets:3, with:"2A"},
+    {label:"3A", ex:"Overhead triceps extension", dose:"3 × 12–15", sets:3, with:"3B"},
+    {label:"3B", ex:"Band lat pulldown", dose:"3 × 10–12", sets:3, with:"3A"},
+    {label:"Finisher", ex:"Plank", dose:"2 × 20–40 sec", sets:2}
+  ]},
+  {key:"Day 2", title:"Full body B", sub:"Lunge, row, press, glutes, back", steps:[
+    {label:"1A", ex:"Reverse lunge", dose:"3 × 8–10 per leg", sets:3, with:"1B"},
+    {label:"1B", ex:"Bent-over two-arm dumbbell row", dose:"3 × 10–12", sets:3, with:"1A"},
+    {label:"2A", ex:"Dumbbell overhead press", dose:"3 × 8–12", sets:3, with:"2B"},
+    {label:"2B", ex:"Glute bridge with band", dose:"3 × 12–15", sets:3, with:"2A"},
+    {label:"3A", ex:"Reverse fly", dose:"3 × 12–15", sets:3, with:"3B"},
+    {label:"3B", ex:"Close-grip floor press", dose:"3 × 10–12", sets:3, with:"3A"},
+    {label:"Finisher", ex:"Dead bug", dose:"2 × 8 per side", sets:2}
+  ]},
+  {key:"Day 3", title:"Full body C", sub:"Wide squat, pulldown, triceps push-up, back", steps:[
+    {label:"1A", ex:"Sumo goblet squat", dose:"3 × 10–12", sets:3, with:"1B"},
+    {label:"1B", ex:"Band lat pulldown", dose:"3 × 10–12", sets:3, with:"1A"},
+    {label:"2A", ex:"Close-grip push-up", dose:"3 × 8–12", sets:3, with:"2B"},
+    {label:"2B", ex:"Dumbbell Romanian deadlift", dose:"3 × 10–12", sets:3, with:"2A"},
+    {label:"3A", ex:"Staggered-stance one-arm row", dose:"3 × 8–12 per side", sets:3, with:"3B"},
+    {label:"3B", ex:"Lateral band walk", dose:"2 × 15 steps per side", sets:2, with:"3A"},
+    {label:"Finisher", ex:"Farmer's march", dose:"3 × 30–45 sec", sets:3}
+  ]}
+];
+DAYS.forEach(d => d.steps.unshift(WARM));
+
+const $ = id => document.getElementById(id);
+let day = null, idx = 0, animCtl = null;
+const WIDE = window.matchMedia ? matchMedia("(min-width: 900px)") : {matches: false};
+const doneSets = {};   // in-memory set check marks, keyed by "day-step"
+
+DAYS.forEach((d, i) => {
+  const b = document.createElement("button");
+  b.className = "day";
+  b.innerHTML = `<div class="k">${d.key}</div><div class="t">${d.title}</div><div class="m">${d.sub} &middot; ${d.steps.length-1} exercises + warm-up</div>`;
+  b.onclick = () => { day = i; idx = 0; show(); };
+  $("days").appendChild(b);
+});
+
+function home(){ if (animCtl){ animCtl.destroy(); animCtl = null; } day = null; history.replaceState(null,"",location.pathname); $("player").hidden = true; $("home").hidden = false; window.scrollTo(0,0); }
+
+// Wide screens: make the card exactly fill the window, scale the animation/photos into the
+// space that's left, and shrink the instruction column slightly if it would otherwise overflow.
+function fitWide(){
+  const card = $("card"), R = card.querySelector(".colR"), Lc = card.querySelector(".colL");
+  card.style.height = "";
+  if (R){ R.style.zoom = ""; R.style.maxHeight = ""; R.style.overflowY = ""; }
+  if (!WIDE.matches || !R || card.hidden) return;
+  const padB = parseFloat(getComputedStyle(document.querySelector(".wrap")).paddingBottom) || 0;
+  const avail = Math.max(380, window.innerHeight - card.getBoundingClientRect().top - padB - 2);
+  const cs = getComputedStyle(card);
+  const inner = avail - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  // left column
+  const fixed = ["tabs", "legend", "vrow"].reduce((s, c) => { const e = Lc.querySelector("." + c); return s + (e && e.offsetParent ? e.offsetHeight : 0); }, 0) + 30;
+  const room = Math.max(170, inner - fixed);
+  const w = Math.min(Lc.clientWidth, room * 360 / 272);
+  const A = $("anim"), lg = Lc.querySelector(".legend");
+  if (A) A.style.maxWidth = w + "px";
+  if (lg) lg.style.maxWidth = w + "px";
+  const note = Lc.querySelector(".photonote");
+  const noteH = note && note.offsetParent ? note.offsetHeight + 14 : 80;
+  Lc.querySelectorAll(".photos img").forEach(i => i.style.maxHeight = Math.max(120, room - noteH - 22) + "px");
+  // right column
+  let z = 1;
+  for (let k = 0; k < 4; k++){
+    const need = R.getBoundingClientRect().height;
+    if (need <= inner + 1) break;
+    z = Math.max(0.74, z * inner / need);
+    R.style.zoom = z.toFixed(3);
+    if (z === 0.74) break;
+  }
+  if (R.getBoundingClientRect().height > inner + 1){ R.style.maxHeight = (inner / z) + "px"; R.style.overflowY = "auto"; }
+}
+let fitTimer = 0;
+window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitWide, 80); });
+
+function cueList(a){ return "<ul class='cues'>" + a.map(c=>"<li>"+c+"</li>").join("") + "</ul>"; }
+
+function show(){
+  const d = DAYS[day], total = d.steps.length;
+  $("home").hidden = true; $("player").hidden = false;
+  $("day-name").textContent = d.key + ": " + d.title;
+  history.replaceState(null,"","#d"+(day+1)+"-"+(idx+1));
+  const finished = idx >= total;
+  $("card").hidden = finished; $("done").hidden = !finished;
+  $("nav").hidden = finished; $("rest").hidden = finished; $("topnav").style.visibility = finished ? "hidden" : "";
+  $("bar").style.width = (Math.min(idx,total)/total*100) + "%";
+  if (finished){ $("count").textContent = "Everything complete"; window.scrollTo(0,0); return; }
+
+  const s = d.steps[idx];
+  $("count").textContent = idx === 0 ? "Warm-up, then " + (total-1) + " exercises" : `Exercise ${idx} of ${total-1}`;
+  let h = "";
+  if (s.warm){
+    h = `<h2>${s.title}</h2><p class="pair">Loosen up before the heavy stuff. Keep it easy.</p>` + cueList(s.cues);
+    $("card").className = "card warmcard";
+  } else {
+    const ex = EX[s.ex], imgs = IMG[ex.img] || [], cap = ex.cap || ["Start","Finish"];
+    const hasAnim = FIG.keys.includes(s.ex);
+    let head = `<div class="titlerow"><span class="label">${s.label}</span><h2>${s.ex}</h2></div>`;
+    head += s.with ? `<div class="pair">Paired with ${s.with}: do this, rest 30 sec, do ${s.with}, then rest 60–90 sec.</div>` : `<div class="pair">Do this after your pairs are finished.</div>`;
+    head += `<div class="chips"><span class="chip dose">${s.dose}</span>` + ex.focus.map(f=>`<span class="chip">${f}</span>`).join("") + `</div>`;
+    let media = `<div class="tabs">` + (hasAnim ? `<button class="tab on" data-tab="anim">Animation</button>` : ``) + `<button class="tab${hasAnim ? "" : " on"}" data-tab="photo">Real photos</button></div>`;
+    if (hasAnim) media += `<div class="pane" id="pane-anim"><div class="anim" id="anim" title="Tap to pause or play"></div><div class="legend"><span><i class="dot"></i>Red glow = where you should feel it</span><span>Tap to pause</span></div></div>`;
+    media += `<div class="pane" id="pane-photo"${hasAnim ? " hidden" : ""}>`;
+    if (imgs.length) media += `<div class="photos">` + imgs.map((u,i)=>`<figure><img src="${u}" alt="${s.ex}, ${cap[i]}"><figcaption>${cap[i]}</figcaption></figure>`).join("") + `</div>`;
+    if (ex.photo) media += `<div class="photonote">📷 ${ex.photo}</div>`;
+    media += `</div>`;
+    let info = `<h3>How to do it</h3>` + cueList(ex.cues);
+    info += `<div class="tips"><div class="easier"><b>Too hard right now?</b> ${ex.easier}</div>`;
+    if (ex.board) info += `<div class="board"><b>Platform option:</b> ${ex.board}</div>`;
+    info += `</div><div class="setrow"><h3>Sets done</h3><div class="sets">`;
+    for (let i=1;i<=s.sets;i++){ const k = day+"-"+idx+"-"+i; info += `<button data-k="${k}" class="${doneSets[k]?'on':''}">${doneSets[k]?'✓ ':''}Set ${i}</button>`; }
+    info += `</div></div>`;
+    const video = `<div class="vrow"><a class="vcard" target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=${ex.vid}"><span class="vthumb"><img src="https://i.ytimg.com/vi/${ex.vid}/hqdefault.jpg" alt="" onerror="this.parentNode.style.display='none'"><span class="play">▶</span></span><span class="vtxt"><b>Watch a tutorial video</b><small>Opens YouTube</small></span></a>` +
+      `<a class="more" target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.vq)}">More videos for this exercise</a></div>`;
+    h = WIDE.matches ? `<div class="colL">${media}${video}</div><div class="colR">${head}${info}</div>` : head + media + info + video;
+    $("card").className = "card split";
+  }
+  if (animCtl){ animCtl.destroy(); animCtl = null; }
+  $("card").innerHTML = h;
+  const animEl = $("anim");
+  if (animEl){
+    animCtl = FIG.mount(animEl, d.steps[idx].ex);
+    if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) animCtl.toggle();
+    animEl.onclick = () => animCtl.toggle();
+  }
+  $("card").querySelectorAll(".tab").forEach(b => b.onclick = () => {
+    $("card").querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
+    const pa = $("pane-anim"), pp = $("pane-photo");
+    if (pa) pa.hidden = b.dataset.tab !== "anim";
+    if (pp) pp.hidden = b.dataset.tab !== "photo";
+    fitWide();
+  });
+  $("card").querySelectorAll(".sets button").forEach(b => b.onclick = () => {
+    const k = b.dataset.k; doneSets[k] = !doneSets[k];
+    const n = b.textContent.replace("✓ ","");
+    b.className = doneSets[k] ? "on" : ""; b.textContent = (doneSets[k] ? "✓ " : "") + n;
+  });
+  $("prev").disabled = $("prevT").disabled = idx === 0;
+  $("next").textContent = $("nextT").textContent = idx === total-1 ? "Finish" : "Next";
+  window.scrollTo(0,0);
+  fitWide();
+}
+
+$("next").onclick = $("nextT").onclick = () => { idx++; show(); };
+$("prev").onclick = $("prevT").onclick = () => { if (idx>0){ idx--; show(); } };
+// re-arrange the card when the screen crosses the wide-layout breakpoint
+if (WIDE.addEventListener) WIDE.addEventListener("change", () => { if (!$("player").hidden && day !== null) show(); });
+$("back-home").onclick = home;
+$("done-home").onclick = home;
+document.addEventListener("keydown", e => {
+  if ($("player").hidden) return;
+  if (e.key === "ArrowRight" && idx < DAYS[day].steps.length) { idx++; show(); }
+  if (e.key === "ArrowLeft" && idx > 0) { idx--; show(); }
+});
+
+const m = location.hash.match(/^#d(\d)-(\d+)$/);
+if (m && DAYS[m[1]-1]) { day = m[1]-1; idx = Math.min(+m[2]-1, DAYS[day].steps.length); show(); }
+</script>
+</body>
+</html>

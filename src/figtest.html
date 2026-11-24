@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{margin:0;background:#fff;font:11px sans-serif}
+.g{display:grid;grid-template-columns:repeat(5,240px);gap:4px;padding:4px}
+.c{border:1px solid #ccc}.c div{padding:2px 4px;background:#eee}
+svg{width:240px;display:block}
+</style></head><body><div class="g" id="g"></div>
+<script src="figures.js"></script>
+<script>
+const q = new URLSearchParams(location.search), from = +q.get('from')||0, to = +q.get('to')||99;
+const g = document.getElementById('g');
+(q.get('idx') ? q.get('idx').split(',').map(i=>FIG.keys[+i]) : FIG.keys.slice(from,to)).forEach(k=>{
+  [0,0.25,0.5,0.75,1].forEach(u=>{
+    const d=document.createElement('div'); d.className='c';
+    d.innerHTML='<div>'+k+' '+u+'</div>'+FIG.render(k,u,1);
+    g.appendChild(d);
+  });
+});
+</script></body></html>
