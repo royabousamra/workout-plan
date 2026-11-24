@@ -34,6 +34,16 @@ pip install pillow
 python build.py
 ```
 
+## Publishing (Firebase Hosting)
+The site is published to the Firebase project `workout-plan-3a087` by GitHub Actions
+(`.github/workflows/firebase-hosting.yml`) on every push to `main`, or on demand from the Actions tab.
+It serves `dist/my-workout-plan.html` at https://workout-plan-3a087.web.app.
+
+One-time setup: add a repository secret named `FIREBASE_SERVICE_ACCOUNT_WORKOUT_PLAN_3A087` containing a
+service account key for the project (Firebase console → Project settings → Service accounts → Generate new private key).
+
+To deploy by hand instead: `npx firebase-tools deploy --only hosting` from the repo root.
+
 ## Credits
 Exercise photos are from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain, Unlicense).
 Animations were drawn for this project. Form cues are general guidance, not medical advice.
