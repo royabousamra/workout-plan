@@ -12,21 +12,31 @@ Open `dist/my-workout-plan.html` in any browser. It's a single file and works of
 - **Remembers your progress:** ticked sets, what you used ("10 lb", "green band") and where you are. Leave mid-workout and continue later. Each exercise shows what you used last time.
 - **Check-ins:** finishing a workout asks how it felt and logs it. You can also log a workout or other activity (a walk, a class) by hand, for any past date.
 - **History:** a calendar of workout days, workouts this week against your target, a weekly streak, "Next up" on the next day in rotation, and a list of past check-ins.
+- **Cloud sync:** sign in with a username and password (History → Cloud sync) to keep your history in the cloud and use it on several devices. Changes sync a moment after you make them, and again whenever you come back to the page.
 - **Backup:** export and import your data as a JSON file to keep it safe or move it to another device.
 - **Visuals:** animated demos (drawn in code as SVG) with a red glow on the working muscles and on-screen tempo cues, plus real start/finish photos.
 - **Layouts:** stacked on phones, two columns on laptops and desktops, fitting on one screen.
 
-Data is stored in the browser's local storage, so it stays on the device and browser you use.
+Data is always saved in the browser's local storage first, so the page works offline. When you're signed in it is
+also kept in Firestore as one document per account (`users/{uid}`). When local and cloud copies differ they are merged:
+check-ins from both are kept, deletions carry over, the newest saved weight per exercise wins, and the most recently
+changed copy decides the program choice and any workout in progress.
+
+Sign-in uses Firebase Authentication (email/password). A username like `roy` is stored as `roy@workout-plan-3a087.firebaseapp.com`.
+No email is ever sent, so a forgotten password is reset from the Firebase console (Authentication → Users).
+The Firestore rules (`firestore.rules`) only let each account read and write its own document.
+Cloud sync is off when the page is opened as a local file.
 
 ## Project layout
 | Path | What it is |
 |---|---|
-| `src/template.html` | Page layout, styles, exercise library, both programs, saving and check-ins |
+| `src/template.html` | Page layout, styles, exercise library, both programs, saving, check-ins and cloud sync |
 | `src/figures.js` | Animation engine: poses for each exercise, drawn as SVG every frame |
 | `src/figtest.html` | Preview sheet showing each animation at five points in the movement |
 | `assets/photos/` | Start/finish photos for each exercise |
 | `assets/band-platform.png` | Photo of the band platform |
 | `build.py` | Inlines everything into `dist/my-workout-plan.html` |
+| `firestore.rules` | Firestore security rules (already published in the console; deploy changes with `npx firebase-tools deploy --only firestore:rules`) |
 
 ## Building
 ```

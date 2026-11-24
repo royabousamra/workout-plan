@@ -143,6 +143,15 @@
   .lastdone{font-size:12.5px;color:var(--muted);margin-top:6px}
   .homebtns{display:flex;gap:10px;margin:14px 0 2px}
   .homebtns .btn{padding:12px}
+  .cloudline{font-size:13.5px;color:var(--muted);text-align:center;margin-top:10px}
+  .cloudline .link{font-size:13.5px;padding:2px 0}
+  .cloudstat{font-size:14.5px;margin:2px 0 12px}
+  .cloudstat .st{display:block;color:var(--muted);font-size:13.5px;margin-top:2px}
+  .cloudstat .st.bad{color:var(--accent-d)}
+  .cloudbtns{display:flex;gap:8px}
+  .cloudbtns .btn{padding:11px}
+  .cloudmsg{font-size:13.5px;color:var(--accent-d);min-height:1em}
+  #cloudbox .pair{margin-bottom:4px}
   /* ---- history ---- */
   .histgrid{display:grid;gap:14px}
   .histgrid .card{margin-bottom:14px}
@@ -235,6 +244,8 @@
       <button class="btn ghost" id="open-history">📅 History &amp; check-ins</button>
       <button class="btn ghost" id="open-checkin">✓ Check in a workout</button>
     </div>
+    <div class="cloudline" id="cloudline" hidden>
+    </div>
 
     <div class="info-row">
     <details class="info" id="howto">
@@ -295,9 +306,13 @@
           <h2>Recent check-ins</h2>
           <div id="loglist"></div>
         </div>
+        <div class="card" id="cloudcard">
+          <h2>☁ Cloud sync</h2>
+          <div id="cloudbox"></div>
+        </div>
         <div class="card dataops">
           <h3>Your data</h3>
-          <p class="pair">Saved only in this browser. Export a backup now and then, or to move it to your phone.</p>
+          <p class="pair" id="datanote">Saved only in this browser. Export a backup now and then, or to move it to your phone.</p>
           <div class="opsrow">
             <button class="btn ghost" id="exp">Export backup</button>
             <button class="btn ghost" id="imp">Import backup</button>
@@ -992,22 +1007,53 @@ const FEEL_TXT = Object.fromEntries(FEELS);
 // ---------- saved state ----------
 const STORE_KEY = "workoutPlan.v1";
 let storageOK = true;
-function blankState(){ return {v:1, program:"3", active:null, log:[], last:{}}; }
+// del: ids of deleted check-ins -> when (so a deletion also reaches other devices)
+// upd: when this device last changed anything (newest wins for program + workout in progress)
+// wipedAt: when "Clear all data" was last used (drops older saved weights on other devices)
+function blankState(){ return {v:1, program:"3", active:null, log:[], last:{}, del:{}, upd:0, wipedAt:0}; }
+function normState(raw){
+  const s = Object.assign(blankState(), raw);
+  if (!PROGRAMS[s.program]) s.program = "3";
+  if (!Array.isArray(s.log)) s.log = [];
+  s.log = s.log.filter(e => e && e.id && e.date);
+  if (!s.last || typeof s.last !== "object") s.last = {};
+  if (!s.del || typeof s.del !== "object") s.del = {};
+  s.upd = +s.upd || 0; s.wipedAt = +s.wipedAt || 0;
+  if (s.active && !(PROGRAMS[s.active.prog] && PROGRAMS[s.active.prog].days[s.active.day])) s.active = null;
+  return s;
+}
 function loadState(){
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return blankState();
-    const s = Object.assign(blankState(), JSON.parse(raw));
-    if (!PROGRAMS[s.program]) s.program = "3";
-    if (!Array.isArray(s.log)) s.log = [];
-    if (!s.last || typeof s.last !== "object") s.last = {};
-    if (s.active && !(PROGRAMS[s.active.prog] && PROGRAMS[s.active.prog].days[s.active.day])) s.active = null;
-    return s;
+    return raw ? normState(JSON.parse(raw)) : blankState();
   } catch (e) { storageOK = false; return blankState(); }
 }
-function save(){
+function writeLocal(){
   try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
   catch (e) { storageOK = false; $("nostore").hidden = false; }
+}
+// Every change goes through save(): stamp it, keep it here, and send it to the cloud shortly after.
+function save(){ S.upd = Date.now(); writeLocal(); cloudSoon(); }
+// Combine this device's data with the cloud copy. Nothing is lost: check-ins are pooled,
+// deletions win over older copies, the newest saved weight per exercise wins.
+function mergeStates(a, b){
+  const del = Object.assign({}, a.del), wipedAt = Math.max(a.wipedAt, b.wipedAt);
+  Object.entries(b.del).forEach(([k, t]) => { if (!del[k] || t > del[k]) del[k] = t; });
+  const byId = {};
+  a.log.concat(b.log).forEach(e => {
+    if (del[e.id] && !((e.rev || 0) > del[e.id])) return;
+    if (wipedAt && Math.max(e.rev || 0, e.at || 0) < wipedAt) return;
+    if (!byId[e.id] || (e.rev || 0) > (byId[e.id].rev || 0)) byId[e.id] = e;
+  });
+  const lastKey = v => (v.date || "") + ":" + String(v.at || 0).padStart(15, "0");
+  const last = {};
+  [a.last, b.last].forEach(L => Object.entries(L).forEach(([k, v]) => {
+    if (!v || (wipedAt && (v.at || 0) < wipedAt)) return;
+    if (!last[k] || lastKey(v) > lastKey(last[k])) last[k] = v;
+  }));
+  const newer = b.upd > a.upd ? b : a, sortObj = o => Object.fromEntries(Object.keys(o).sort().map(k => [k, o[k]]));
+  return {v:1, program:newer.program, active:newer.active, log:Object.values(byId).sort((x, y) => x.id < y.id ? -1 : 1),
+    last:sortObj(last), del:sortObj(del), upd:Math.max(a.upd, b.upd), wipedAt};
 }
 let S = loadState();
 try { localStorage.setItem(STORE_KEY + ".test", "1"); localStorage.removeItem(STORE_KEY + ".test"); } catch (e) { storageOK = false; }
@@ -1078,6 +1124,7 @@ function renderHome(){
   $("subtitle").textContent = (n === 3 ? "Full-body workouts" : "Upper / lower split") + " for back, arms and legs. No bench or table needed, and a mat-sized space is enough. Pick today's workout (" + P.schedule + ").";
   document.querySelectorAll("#progseg button").forEach(b => b.classList.toggle("on", b.dataset.prog === S.program));
   $("nostore").hidden = storageOK;
+  renderCloud();
 
   // resume banner
   const a = A(), r = $("resume");
@@ -1130,7 +1177,7 @@ document.querySelectorAll("#progseg button").forEach(b => b.onclick = () => {
 let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let ciFeel = "good";
 function openHistory(focusCheckin){
-  fillCheckinForm(); renderHistory(); setView("history");
+  fillCheckinForm(); renderHistory(); renderCloud(); setView("history");
   history.replaceState(null, "", "#history");
   if (focusCheckin) setTimeout(() => $("checkin").scrollIntoView({behavior:"smooth", block:"start"}), 30);
 }
@@ -1180,7 +1227,7 @@ function renderHistory(){
       `<button class="del" data-id="${e.id}" aria-label="Delete this check-in">✕</button></div>`;
   }).join("") : `<p class="pair">No check-ins yet. Finish a workout, or log one with the form.</p>`;
   $("loglist").querySelectorAll(".del").forEach(b => b.onclick = function(){
-    confirmTwice(this, "Delete?", () => { S.log = S.log.filter(e => e.id !== b.dataset.id); save(); renderHistory(); toast("Check-in deleted"); });
+    confirmTwice(this, "Delete?", () => { S.log = S.log.filter(e => e.id !== b.dataset.id); S.del[b.dataset.id] = Date.now(); save(); renderHistory(); toast("Check-in deleted"); });
   });
 }
 $("cal-prev").onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderHistory(); };
@@ -1207,18 +1254,178 @@ $("impfile").onchange = async e => {
   try {
     const d = JSON.parse(await f.text());
     if (!d || !Array.isArray(d.log)) throw new Error("bad");
-    const ids = new Set(S.log.map(x => x.id)); let added = 0;
-    d.log.forEach(x => { if (x && x.id && x.date && x.title && !ids.has(x.id)){ S.log.push(x); added++; } });
-    if (d.last && typeof d.last === "object") Object.entries(d.last).forEach(([k, v]) => { if (!S.last[k] || (v && v.date > S.last[k].date)) S.last[k] = v; });
+    const ids = new Set(S.log.map(x => x.id)), now = Date.now(); let added = 0;
+    // rev marks a restored check-in as newer than any earlier deletion or "clear all"
+    d.log.forEach(x => { if (x && x.id && x.date && x.title && !ids.has(x.id)){ S.log.push(Object.assign({}, x, {rev:now})); added++; } });
+    if (d.last && typeof d.last === "object") Object.entries(d.last).forEach(([k, v]) => { if (v && v.date && (!S.last[k] || v.date > S.last[k].date)) S.last[k] = Object.assign({}, v, {at:now}); });
     save(); renderHistory(); toast("Imported " + added + " check-in" + (added === 1 ? "" : "s"));
   } catch (err) { toast("That file isn't a backup from this site"); }
 };
 $("wipe").onclick = function(){
-  confirmTwice(this, "Tap again to delete everything", () => { const p = S.program; S = blankState(); S.program = p; save(); renderHistory(); toast("All data cleared"); });
+  confirmTwice(this, cloud.user ? "Tap again: deletes here and in the cloud" : "Tap again to delete everything", () => {
+    const now = Date.now(), del = Object.assign({}, S.del), p = S.program;
+    S.log.forEach(e => del[e.id] = now);
+    S = blankState(); S.program = p; S.del = del; S.wipedAt = now;
+    save(); renderHistory(); toast("All data cleared");
+  });
 };
 $("open-history").onclick = () => openHistory(false);
 $("open-checkin").onclick = () => openHistory(true);
 $("hist-home").onclick = home;
+
+// ---------- cloud sync (Firebase) ----------
+// Sign in with a username + password; the whole history is kept as one document per account
+// (users/{uid}), readable only by that account. The Firebase code is only downloaded once you
+// use sync, so the page still works offline and as a local file.
+const FB_CFG = {
+  apiKey: "AIzaSyCEg5XQJS3mD_FSomUo4ut_cNC3lnWtNIQ",
+  authDomain: "workout-plan-3a087.firebaseapp.com",
+  projectId: "workout-plan-3a087",
+  storageBucket: "workout-plan-3a087.firebasestorage.app",
+  messagingSenderId: "3893794155",
+  appId: "1:3893794155:web:930e0148855f2b57f1e82e"
+};
+const FB_SDK = "https://www.gstatic.com/firebasejs/13.4.0/";
+const USER_DOMAIN = "@workout-plan-3a087.firebaseapp.com";   // usernames become name@this, no email is ever sent
+const CLOUD_FLAG = STORE_KEY + ".cloud";
+const LIVE_URL = "https://workout-plan-3a087.web.app";
+const canCloud = /^https?:$/.test(location.protocol);
+const cloud = {user:null, state:"off", at:0, msg:""};
+let fbP = null, fb = null, pushT = null, syncP = null, syncAgain = false;
+
+function loadFb(){
+  if (!fbP) fbP = (async () => {
+    const [app, A, F] = await Promise.all(["firebase-app", "firebase-auth", "firebase-firestore"].map(n => import(FB_SDK + n + ".js")));
+    const inst = app.initializeApp(FB_CFG);
+    fb = {A, F, auth:A.getAuth(inst), db:F.getFirestore(inst)};
+    A.onAuthStateChanged(fb.auth, u => {
+      cloud.user = u;
+      if (u){ try { localStorage.setItem(CLOUD_FLAG, "1"); } catch (e) {} syncNow(); }
+      else { cloud.state = "off"; renderCloud(); }
+    });
+    return fb;
+  })().catch(e => { fbP = null; throw e; });
+  return fbP;
+}
+function setCloud(state, msg){ cloud.state = state; cloud.msg = msg || ""; renderCloud(); }
+function cloudSoon(){
+  if (!cloud.user) return;
+  clearTimeout(pushT); pushT = setTimeout(() => { pushT = null; syncNow(); }, 1500);
+}
+async function syncNow(){
+  if (!cloud.user || !fb) return;
+  if (syncP){ syncAgain = true; return syncP; }
+  clearTimeout(pushT); pushT = null;
+  syncP = (async () => {
+    setCloud("syncing");
+    try {
+      const {F, db} = fb, ref = F.doc(db, "users", cloud.user.uid);
+      const snap = await F.getDoc(ref);
+      let remote = null;
+      if (snap.exists()){ try { remote = normState(JSON.parse(snap.data().state)); } catch (e) {} }
+      const merged = remote ? mergeStates(S, remote) : mergeStates(S, blankState());
+      // keep the same in-progress object so an open workout keeps ticking into it
+      if (JSON.stringify(merged.active) === JSON.stringify(S.active)) merged.active = S.active;
+      const mj = JSON.stringify(merged), changedHere = mj !== JSON.stringify(S);
+      S = merged; writeLocal();
+      if (!remote || mj !== JSON.stringify(remote)) await F.setDoc(ref, {state:mj, updatedAt:F.serverTimestamp()});
+      cloud.at = Date.now(); setCloud("ok");
+      if (changedHere){ if (view === "home") renderHome(); else if (view === "history") renderHistory(); }
+    } catch (e) {
+      const off = navigator.onLine === false || /offline|unavailable|network/i.test((e.code || "") + " " + (e.message || ""));
+      setCloud(off ? "offline" : "error", e.code || e.message);
+    }
+  })();
+  try { await syncP; } finally { syncP = null; if (syncAgain){ syncAgain = false; syncNow(); } }
+}
+const AUTH_ERR = {
+  "auth/invalid-credential":"Wrong username or password.", "auth/wrong-password":"Wrong username or password.",
+  "auth/user-not-found":"Wrong username or password.", "auth/invalid-login-credentials":"Wrong username or password.",
+  "auth/email-already-in-use":"That username is taken. If it's yours, use Sign in.",
+  "auth/weak-password":"Password needs at least 6 characters.",
+  "auth/too-many-requests":"Too many tries. Wait a few minutes and try again.",
+  "auth/network-request-failed":"No connection. Try again when you're online.",
+  "auth/operation-not-allowed":"New accounts are turned off for this site.", "auth/admin-restricted-operation":"New accounts are turned off for this site."
+};
+async function doAuth(create){
+  const u = $("cl-user").value.trim(), p = $("cl-pass").value, msg = $("cl-msg");
+  if (!/^[A-Za-z0-9._-]{3,30}$/.test(u)){ msg.textContent = "Username: 3 to 30 letters, numbers, dots, dashes or underscores."; return; }
+  if (p.length < 6){ msg.textContent = "Password needs at least 6 characters."; return; }
+  msg.textContent = create ? "Creating your account…" : "Signing in…";
+  document.querySelectorAll("#cloudbox button").forEach(b => b.disabled = true);
+  try {
+    const {A, auth} = await loadFb(), email = u.toLowerCase() + USER_DOMAIN;
+    if (create) await A.createUserWithEmailAndPassword(auth, email, p);
+    else await A.signInWithEmailAndPassword(auth, email, p);
+    toast(create ? "Account created. Your history is syncing." : "Signed in. Syncing your history.");
+  } catch (e) {
+    msg.textContent = AUTH_ERR[e.code] || (e.code ? "Couldn't sign in (" + e.code + ")." : "Couldn't reach the sync service. Check your connection.");
+    document.querySelectorAll("#cloudbox button").forEach(b => b.disabled = false);
+  }
+}
+function renderCloud(){
+  const box = $("cloudbox"), line = $("cloudline"), name = cloud.user ? cloud.user.email.split("@")[0] : "";
+  const when = cloud.at ? new Date(cloud.at).toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"}) : "";
+  const st = {syncing:"Syncing…", ok:"Synced" + (when ? " at " + when : ""), loading:"Connecting…",
+    offline:"Offline. Changes are saved here and will sync when you're back online.",
+    error:"Sync problem" + (cloud.msg ? " (" + cloud.msg + ")" : "") + ". Your data is safe here; try Sync now."}[cloud.state] || "";
+  $("datanote").textContent = cloud.user
+    ? "Saved in this browser and synced to your account. You can still export a backup file any time."
+    : "Saved only in this browser. Sign in above to sync it, or export a backup now and then.";
+
+  if (!canCloud){
+    box.innerHTML = `<p class="pair">Cloud sync works on the online version of this page: <a href="${LIVE_URL}">${LIVE_URL.replace("https://", "")}</a>. Export a backup below and import it there to bring this history along.</p>`;
+    line.hidden = true; return;
+  }
+  if (cloud.user){
+    box.innerHTML = `<div class="cloudstat">Signed in as <b>${esc(name)}</b><span class="st${cloud.state === "error" || cloud.state === "offline" ? " bad" : ""}">${esc(st)}</span></div>` +
+      `<div class="cloudbtns"><button class="btn ghost" id="cl-sync"${cloud.state === "syncing" ? " disabled" : ""}>Sync now</button><button class="btn ghost" id="cl-out">Sign out</button></div>`;
+    $("cl-sync").onclick = () => syncNow();
+    $("cl-out").onclick = function(){
+      confirmTwice(this, "Tap again to sign out", async () => {
+        try { localStorage.removeItem(CLOUD_FLAG); } catch (e) {}
+        try { await fb.A.signOut(fb.auth); } catch (e) {}
+        cloud.user = null; cloud.at = 0; setCloud("off"); toast("Signed out. Your history stays on this device.");
+      });
+    };
+    line.innerHTML = "☁ " + (cloud.state === "ok" ? "Synced as " + esc(name) : cloud.state === "offline" ? "Offline, will sync later" : cloud.state === "error" ? "Sync problem, see History" : "Syncing…");
+    line.hidden = false; return;
+  }
+  if (cloud.state === "loading" || cloud.state === "offline"){
+    box.innerHTML = `<p class="pair">${esc(cloud.state === "loading" ? "Connecting…" : "Offline. Your history is saved here and will sync when you're back online.")}</p>`;
+    line.innerHTML = "☁ " + esc(cloud.state === "loading" ? "Connecting…" : "Offline, will sync later"); line.hidden = false; return;
+  }
+  // Keep whatever was typed if this re-renders mid-sign-in.
+  const keepU = $("cl-user") ? $("cl-user").value : "";
+  box.innerHTML = `<p class="pair">Back up your history and use it on your phone and computer. Pick a username and password the first time, then sign in with them on each device.</p>` +
+    `<form class="form" id="cl-form" autocomplete="on">` +
+    `<label>Username <input type="text" id="cl-user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required></label>` +
+    `<label>Password <input type="password" id="cl-pass" autocomplete="current-password" minlength="6" required></label>` +
+    `<div class="cloudmsg" id="cl-msg"></div>` +
+    `<div class="cloudbtns"><button class="btn primary" type="submit">Sign in</button><button class="btn ghost" type="button" id="cl-new">Create account</button></div></form>`;
+  $("cl-user").value = keepU;
+  $("cl-form").onsubmit = e => { e.preventDefault(); doAuth(false); };
+  $("cl-new").onclick = () => doAuth(true);
+  line.innerHTML = `☁ <button class="link" id="cl-go">Sign in to back up your history</button>`;
+  $("cl-go").onclick = () => { openHistory(false); setTimeout(() => $("cloudcard").scrollIntoView({behavior:"smooth", block:"start"}), 30); };
+  line.hidden = false;
+}
+function cloudStart(){
+  if (!canCloud) return;
+  let had = false; try { had = localStorage.getItem(CLOUD_FLAG) === "1"; } catch (e) {}
+  if (!had) return;
+  setCloud(navigator.onLine === false ? "offline" : "loading");
+  loadFb().catch(() => setCloud("offline"));
+}
+document.addEventListener("visibilitychange", () => {
+  if (!cloud.user) return;
+  if (document.visibilityState === "visible") syncNow();
+  else if (pushT) syncNow();          // flush pending changes when the tab is hidden
+});
+window.addEventListener("online", () => {
+  if (cloud.user) syncNow();
+  else if (canCloud && !fb){ try { if (localStorage.getItem(CLOUD_FLAG) === "1") cloudStart(); } catch (e) {} }
+});
 
 // ---------- player ----------
 // Wide screens: make the card exactly fill the window, scale the animation/photos into the
@@ -1274,7 +1481,7 @@ function renderDone(){
   renderFeel($("dn-feel"), () => a.feel, v => { a.feel = v; save(); });
   $("dn-save").onclick = () => {
     const date = $("dn-date").value && $("dn-date").value <= today() ? $("dn-date").value : today();
-    const weights = {}; Object.entries(a.weights || {}).forEach(([k, v]) => { if (v && v.trim()){ weights[k] = v.trim(); S.last[k] = {w:v.trim(), date}; } });
+    const weights = {}; Object.entries(a.weights || {}).forEach(([k, v]) => { if (v && v.trim()){ weights[k] = v.trim(); S.last[k] = {w:v.trim(), date, at:Date.now()}; } });
     S.log.push({id:newId(), kind:"workout", date, at:Date.now(), prog:S.program, day, title:prog().name + " " + d.key + ": " + d.title,
                 done, total, feel:a.feel, note:$("dn-note").value.trim(), weights});
     S.active = null; save(); home(); toast("Checked in ✓ Nice work!");
@@ -1368,6 +1575,7 @@ document.addEventListener("keydown", e => {
 
 // ---------- start ----------
 (function boot(){
+  cloudStart();
   const h = location.hash;
   let m = h.match(/^#p([34])-d(\d)-(\d+)$/) || (h.match(/^#d(\d)-(\d+)$/) ? ["", "3", ...h.match(/^#d(\d)-(\d+)$/).slice(1)] : null);
   if (m && PROGRAMS[m[1]] && PROGRAMS[m[1]].days[m[2] - 1]){
