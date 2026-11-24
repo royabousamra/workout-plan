@@ -143,8 +143,19 @@
   .lastdone{font-size:12.5px;color:var(--muted);margin-top:6px}
   .homebtns{display:flex;gap:10px;margin:14px 0 2px}
   .homebtns .btn{padding:12px}
-  .cloudline{font-size:13.5px;color:var(--muted);text-align:center;margin-top:10px}
-  .cloudline .link{font-size:13.5px;padding:2px 0}
+  .cloudtop{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:14.5px}
+  .cloudtop .ct small{display:block;color:var(--muted);font-size:13px;margin-top:1px}
+  .cloudtop.on{display:flex;align-items:center;gap:12px;background:var(--okbg);border-color:#b9dcc7;padding:9px 14px}
+  .cloudtop.on .ct{flex:1}
+  .cloudtop.on.bad{background:var(--note);border-color:var(--noteline)}
+  .cloudtop .ci{font-size:20px;line-height:1}
+  .cloudtop .link{padding:4px 2px;font-size:14px}
+  .cloudtop .link:disabled{opacity:.4;cursor:default}
+  .cloudtop .cloudform{margin-top:10px}
+  .cfrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cfrow label{min-width:0} .cloudform input{width:100%;min-width:0;box-sizing:border-box}
+  .cloudtop .cloudmsg:empty{display:none}
+  @media (min-width:900px){ .cloudtop .cloudform{grid-template-columns:1fr 1fr auto;align-items:end} .cloudtop .cloudmsg{grid-column:1/-1;order:3} .cloudtop .cfrow{grid-column:1/3} .cloudtop .cloudbtns .btn{padding:9px 18px} }
   .cloudstat{font-size:14.5px;margin:2px 0 12px}
   .cloudstat .st{display:block;color:var(--muted);font-size:13.5px;margin-top:2px}
   .cloudstat .st.bad{color:var(--accent-d)}
@@ -234,6 +245,8 @@
 
     <div class="warnbar" id="nostore" hidden>This browser isn't letting the page save, so check-ins will be lost when you close it. Open it in Chrome, Edge or Firefox, or use Export in History to keep a copy.</div>
 
+    <div class="cloudtop" id="cloudtop" hidden></div>
+
     <div class="resume" id="resume" hidden></div>
 
     <div class="stats" id="stats"></div>
@@ -243,8 +256,6 @@
     <div class="homebtns">
       <button class="btn ghost" id="open-history">📅 History &amp; check-ins</button>
       <button class="btn ghost" id="open-checkin">✓ Check in a workout</button>
-    </div>
-    <div class="cloudline" id="cloudline" hidden>
     </div>
 
     <div class="info-row">
@@ -270,7 +281,7 @@
       </ul>
     </details>
     </div>
-    <p class="foot">Your settings, progress and check-ins are saved in this browser on this device only. Use Export in History to back them up or move them to another device. Animated demos are drawn for this plan. The real photos are from the <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> project (public domain). Video links open YouTube and need internet. If anything hurts (not just burns), stop and check with a doctor or trainer.</p>
+    <p class="foot">Your settings, progress and check-ins are saved in this browser, and synced to your account when you're signed in. You can also export a backup file from History. Animated demos are drawn for this plan. The real photos are from the <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a> project (public domain). Video links open YouTube and need internet. If anything hurts (not just burns), stop and check with a doctor or trainer.</p>
   </section>
 
   <section id="history" hidden>
@@ -1347,68 +1358,86 @@ const AUTH_ERR = {
   "auth/network-request-failed":"No connection. Try again when you're online.",
   "auth/operation-not-allowed":"New accounts are turned off for this site.", "auth/admin-restricted-operation":"New accounts are turned off for this site."
 };
-async function doAuth(create){
-  const u = $("cl-user").value.trim(), p = $("cl-pass").value, msg = $("cl-msg");
+// The sign-in form appears on the home screen and in History; p is "h" or "c" to keep their ids apart.
+async function doAuth(p, create){
+  const u = $(p + "-user").value.trim(), pw = $(p + "-pass").value, msg = $(p + "-msg");
   if (!/^[A-Za-z0-9._-]{3,30}$/.test(u)){ msg.textContent = "Username: 3 to 30 letters, numbers, dots, dashes or underscores."; return; }
-  if (p.length < 6){ msg.textContent = "Password needs at least 6 characters."; return; }
+  if (pw.length < 6){ msg.textContent = "Password needs at least 6 characters."; return; }
   msg.textContent = create ? "Creating your account…" : "Signing in…";
-  document.querySelectorAll("#cloudbox button").forEach(b => b.disabled = true);
+  const btns = document.querySelectorAll(".cloudform button"); btns.forEach(b => b.disabled = true);
   try {
     const {A, auth} = await loadFb(), email = u.toLowerCase() + USER_DOMAIN;
-    if (create) await A.createUserWithEmailAndPassword(auth, email, p);
-    else await A.signInWithEmailAndPassword(auth, email, p);
+    if (create) await A.createUserWithEmailAndPassword(auth, email, pw);
+    else await A.signInWithEmailAndPassword(auth, email, pw);
     toast(create ? "Account created. Your history is syncing." : "Signed in. Syncing your history.");
   } catch (e) {
     msg.textContent = AUTH_ERR[e.code] || (e.code ? "Couldn't sign in (" + e.code + ")." : "Couldn't reach the sync service. Check your connection.");
-    document.querySelectorAll("#cloudbox button").forEach(b => b.disabled = false);
+    btns.forEach(b => b.disabled = false);
   }
 }
+function cloudForm(p){
+  return `<form class="form cloudform" id="${p}-form" autocomplete="on">` +
+    `<div class="cfrow"><label>Username <input type="text" id="${p}-user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required></label>` +
+    `<label>Password <input type="password" id="${p}-pass" autocomplete="current-password" minlength="6" required></label></div>` +
+    `<div class="cloudmsg" id="${p}-msg"></div>` +
+    `<div class="cloudbtns"><button class="btn primary" type="submit">Sign in</button><button class="btn ghost" type="button" id="${p}-new">Create account</button></div></form>`;
+}
+function wireForm(p){
+  $(p + "-form").onsubmit = e => { e.preventDefault(); doAuth(p, false); };
+  $(p + "-new").onclick = () => doAuth(p, true);
+}
+function signOutBtn(btn){
+  btn.onclick = function(){
+    confirmTwice(this, "Tap again to sign out", async () => {
+      try { localStorage.removeItem(CLOUD_FLAG); } catch (e) {}
+      try { await fb.A.signOut(fb.auth); } catch (e) {}
+      cloud.user = null; cloud.at = 0; setCloud("off"); toast("Signed out. Your history stays on this device.");
+    });
+  };
+}
 function renderCloud(){
-  const box = $("cloudbox"), line = $("cloudline"), name = cloud.user ? cloud.user.email.split("@")[0] : "";
+  const box = $("cloudbox"), top = $("cloudtop"), name = cloud.user ? cloud.user.email.split("@")[0] : "";
   const when = cloud.at ? new Date(cloud.at).toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"}) : "";
   const st = {syncing:"Syncing…", ok:"Synced" + (when ? " at " + when : ""), loading:"Connecting…",
     offline:"Offline. Changes are saved here and will sync when you're back online.",
     error:"Sync problem" + (cloud.msg ? " (" + cloud.msg + ")" : "") + ". Your data is safe here; try Sync now."}[cloud.state] || "";
+  const bad = cloud.state === "error" || cloud.state === "offline";
   $("datanote").textContent = cloud.user
     ? "Saved in this browser and synced to your account. You can still export a backup file any time."
     : "Saved only in this browser. Sign in above to sync it, or export a backup now and then.";
+  // keep anything already typed if this re-renders mid-sign-in
+  const keep = {}; ["h", "c"].forEach(p => { if ($(p + "-user")) keep[p] = [$(p + "-user").value, $(p + "-pass").value, $(p + "-msg").textContent]; });
+  const restore = p => { if (keep[p]){ $(p + "-user").value = keep[p][0]; $(p + "-pass").value = keep[p][1]; $(p + "-msg").textContent = keep[p][2]; } };
 
   if (!canCloud){
     box.innerHTML = `<p class="pair">Cloud sync works on the online version of this page: <a href="${LIVE_URL}">${LIVE_URL.replace("https://", "")}</a>. Export a backup below and import it there to bring this history along.</p>`;
-    line.hidden = true; return;
+    top.hidden = true; return;
   }
+  top.hidden = false;
   if (cloud.user){
-    box.innerHTML = `<div class="cloudstat">Signed in as <b>${esc(name)}</b><span class="st${cloud.state === "error" || cloud.state === "offline" ? " bad" : ""}">${esc(st)}</span></div>` +
+    box.innerHTML = `<div class="cloudstat">Signed in as <b>${esc(name)}</b><span class="st${bad ? " bad" : ""}">${esc(st)}</span></div>` +
       `<div class="cloudbtns"><button class="btn ghost" id="cl-sync"${cloud.state === "syncing" ? " disabled" : ""}>Sync now</button><button class="btn ghost" id="cl-out">Sign out</button></div>`;
     $("cl-sync").onclick = () => syncNow();
-    $("cl-out").onclick = function(){
-      confirmTwice(this, "Tap again to sign out", async () => {
-        try { localStorage.removeItem(CLOUD_FLAG); } catch (e) {}
-        try { await fb.A.signOut(fb.auth); } catch (e) {}
-        cloud.user = null; cloud.at = 0; setCloud("off"); toast("Signed out. Your history stays on this device.");
-      });
-    };
-    line.innerHTML = "☁ " + (cloud.state === "ok" ? "Synced as " + esc(name) : cloud.state === "offline" ? "Offline, will sync later" : cloud.state === "error" ? "Sync problem, see History" : "Syncing…");
-    line.hidden = false; return;
+    signOutBtn($("cl-out"));
+    top.className = "cloudtop on" + (bad ? " bad" : "");
+    top.innerHTML = `<span class="ci">☁</span><div class="ct">Signed in as <b>${esc(name)}</b><small>${esc(cloud.state === "error" ? "Sync problem. Your data is safe here." : st)}</small></div>` +
+      `<button class="link" id="ct-sync"${cloud.state === "syncing" ? " disabled" : ""}>Sync</button><button class="link" id="ct-out">Sign out</button>`;
+    $("ct-sync").onclick = () => syncNow();
+    signOutBtn($("ct-out"));
+    return;
   }
   if (cloud.state === "loading" || cloud.state === "offline"){
-    box.innerHTML = `<p class="pair">${esc(cloud.state === "loading" ? "Connecting…" : "Offline. Your history is saved here and will sync when you're back online.")}</p>`;
-    line.innerHTML = "☁ " + esc(cloud.state === "loading" ? "Connecting…" : "Offline, will sync later"); line.hidden = false; return;
+    const t = cloud.state === "loading" ? "Signing you in…" : "Offline. Your history is saved here and will sync when you're back online.";
+    box.innerHTML = `<p class="pair">${esc(t)}</p>`;
+    top.className = "cloudtop on" + (cloud.state === "offline" ? " bad" : "");
+    top.innerHTML = `<span class="ci">☁</span><div class="ct">${esc(t)}</div>`;
+    return;
   }
-  // Keep whatever was typed if this re-renders mid-sign-in.
-  const keepU = $("cl-user") ? $("cl-user").value : "";
-  box.innerHTML = `<p class="pair">Back up your history and use it on your phone and computer. Pick a username and password the first time, then sign in with them on each device.</p>` +
-    `<form class="form" id="cl-form" autocomplete="on">` +
-    `<label>Username <input type="text" id="cl-user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required></label>` +
-    `<label>Password <input type="password" id="cl-pass" autocomplete="current-password" minlength="6" required></label>` +
-    `<div class="cloudmsg" id="cl-msg"></div>` +
-    `<div class="cloudbtns"><button class="btn primary" type="submit">Sign in</button><button class="btn ghost" type="button" id="cl-new">Create account</button></div></form>`;
-  $("cl-user").value = keepU;
-  $("cl-form").onsubmit = e => { e.preventDefault(); doAuth(false); };
-  $("cl-new").onclick = () => doAuth(true);
-  line.innerHTML = `☁ <button class="link" id="cl-go">Sign in to back up your history</button>`;
-  $("cl-go").onclick = () => { openHistory(false); setTimeout(() => $("cloudcard").scrollIntoView({behavior:"smooth", block:"start"}), 30); };
-  line.hidden = false;
+  box.innerHTML = `<p class="pair">Back up your history and use it on your phone and computer. Pick a username and password the first time, then sign in with them on each device.</p>` + cloudForm("c");
+  wireForm("c"); restore("c");
+  top.className = "cloudtop";
+  top.innerHTML = `<div class="ct"><b>☁ Not signed in</b><small>Sign in so your workouts are saved to your account and show up on all your devices.</small></div>` + cloudForm("h");
+  wireForm("h"); restore("h");
 }
 function cloudStart(){
   if (!canCloud) return;
