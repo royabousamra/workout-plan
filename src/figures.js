@@ -31,6 +31,13 @@ const FIG = (function () {
     const j = [sh[0] + u[0] * L.ua * s, sh[1] + u[1] * L.ua * s];
     return {j, e: [j[0] + f[0] * L.fa * s * k, j[1] + f[1] * L.fa * s * k]};
   }
+  // front/rear arm swinging forward around the body (a chest fly): only the sideways part shrinks,
+  // k = cos(yaw) goes from 1 (out to the side) through 0 (pointing at the viewer) to negative (crossing in front)
+  function fkYaw(sh, angs, dir, k) {
+    const u = dir(angs[0]), f = dir(angs[1]);
+    const j = [sh[0] + u[0] * L.ua * k, sh[1] + u[1] * L.ua];
+    return {j, e: [j[0] + f[0] * L.fa * k, j[1] + f[1] * L.fa]};
+  }
   // legs posed by joint angles: [thigh, shin], same angle convention as the arms
   function fkLeg(hp, angs, dir) {
     const u = dir(angs[0]), f = dir(angs[1]);
@@ -75,7 +82,8 @@ const FIG = (function () {
     if (o.arm && !o.arm2) o.arm2 = o.arm;
     return o;
   }
-  const normFront = P => Object.assign({ts: 1, bl: -1, br: 1, al: -1, ar: 1, as: 1, fo: 12, sx: 0, hx: 0, hy: 0}, P);
+  // kL/kR: [thigh, shin] length scale for a leg pointing partly toward the viewer (front view)
+  const normFront = P => Object.assign({ts: 1, bl: -1, br: 1, al: -1, ar: 1, as: 1, fo: 12, sx: 0, hx: 0, hy: 0, kL: [1, 1], kR: [1, 1]}, P);
   function mix(a, b, u) {
     if (typeof a === "number") return lerp(a, b, u);
     if (Array.isArray(a)) return a.map((v, i) => mix(v, b[i], u));
@@ -108,8 +116,8 @@ const FIG = (function () {
     const legN = P.leg ? fkLeg(hip, P.leg, dS) : ik(hip, P.f, L.th, L.sh, P.lb);
     const legF = P.leg2 ? fkLeg(hip, P.leg2, dS) : ik(hip, P.f2, L.th, L.sh, P.lb);
     const as = P.hab != null ? Math.max(0.03, Math.cos(rad(P.hab))) : P.as;   // arm swinging toward the viewer looks shorter
-    const armN = P.arm ? fk(sh, P.arm, dS, as) : ik(sh, P.hd, L.ua * as, L.fa * as, P.ab);
-    const armF = P.arm2 ? fk(sh, P.arm2, dS, as) : ik(sh, P.hd2, L.ua * as, L.fa * as, P.ab);
+    const armN = P.arm ? fk(sh, P.arm, dS, as, P.fs) : ik(sh, P.hd, L.ua * as, L.fa * as, P.ab);
+    const armF = P.arm2 ? fk(sh, P.arm2, dS, as, P.fs) : ik(sh, P.hd2, L.ua * as, L.fa * as, P.ab);
     return {hip, sh, head, d, nf, hnf, legN, legF, armN, armF, P};
   }
   function anchorsSide(S) {
@@ -117,7 +125,8 @@ const FIG = (function () {
     return {
       back: [[...al(0.68, -6), 22]], chest: [[...al(0.78, 7), 18]], core: [[...al(0.3, 8), 18]],
       glute: [[...al(0, -8), 19]], thigh: [[...mid(S.hip, S.legN.j, 0.55), 20]], thighF: [[...mid(S.hip, S.legF.j, 0.55), 20]],
-      arm: [[...mid(S.sh, S.armN.j, 0.5), 15]], lat: [[...al(0.6, 0), 24]], delt: [[S.sh[0], S.sh[1], 15]]
+      arm: [[...mid(S.sh, S.armN.j, 0.5), 15]], lat: [[...al(0.6, 0), 24]], delt: [[S.sh[0], S.sh[1], 15]],
+      calf: [[...mid(S.legN.j, S.legN.e, 0.4), 14]]
     };
   }
   function drawSide(ex, P) {
@@ -145,10 +154,12 @@ const FIG = (function () {
     const SW = 22, HW = 12;
     const hl = [c[0] - HW, c[1]], hr = [c[0] + HW, c[1]], sl = [sc[0] - SW, sc[1]], sr = [sc[0] + SW, sc[1]];
     const head = [sc[0] + P.hx, sc[1] - (L.nk + L.hd) * (0.55 + 0.45 * s) + P.hy];
-    const lL = P.lgL ? fkLeg(hl, P.lgL, dL) : ik(hl, P.fl, L.th, L.sh, P.bl), lR = ik(hr, P.fr, L.th, L.sh, P.br);
+    const lL = P.lgL ? fkLeg(hl, P.lgL, dL) : ik(hl, P.fl, L.th * P.kL[0], L.sh * P.kL[1], P.bl);
+    const lR = ik(hr, P.fr, L.th * P.kR[0], L.sh * P.kR[1], P.br);
     const as = P.hab != null ? Math.max(0.03, Math.sin(rad(P.hab))) : P.as;
-    const aL = P.armL ? fk(sl, P.armL, dL, as) : ik(sl, P.hl, L.ua * as, L.fa * as, P.al);
-    const aR = P.armR ? fk(sr, P.armR, dR, as, P.fsR) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
+    const yk = P.yaw != null ? Math.cos(rad(P.yaw)) : null;
+    const aL = P.armL ? (yk != null ? fkYaw(sl, P.armL, dL, yk) : fk(sl, P.armL, dL, as)) : ik(sl, P.hl, L.ua * as, L.fa * as, P.al);
+    const aR = P.armR ? (yk != null ? fkYaw(sr, P.armR, dR, yk) : fk(sr, P.armR, dR, as, P.fsR)) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
     return {c, sc, hl, hr, sl, sr, head, lL, lR, aL, aR, P};
   }
   function anchorsFront(S) {
@@ -158,6 +169,7 @@ const FIG = (function () {
       thigh: [[...mid(S.hl, S.lL.j, 0.55), 19], [...mid(S.hr, S.lR.j, 0.55), 19]],
       hipj: [[S.hl[0] - 4, S.hl[1], 17], [S.hr[0] + 4, S.hr[1], 17]],
       upperback: [[S.sc[0], S.sc[1] + 13, 27]],
+      chest: [[S.sc[0] - 11, S.sc[1] + 15, 15], [S.sc[0] + 11, S.sc[1] + 15, 15]],
       innerL: [[mid(S.hl, S.lL.j, 0.5)[0] + 8, mid(S.hl, S.lL.j, 0.5)[1], 15]],
       oblique: [[...mid(S.sr, S.hr, 0.55), 17]]
     };
@@ -279,7 +291,7 @@ const FIG = (function () {
       b: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [262, 270]},
       pb: () => mat(),
       pf: S => { const e = S.armN.e, a = rad(angOf(S.armN.j, e)); return db([e[0] + Math.cos(a) * 9, e[1] + Math.sin(a) * 9], a * 180 / Math.PI); },
-      glow: ["lat"], ge: 0.5,
+      glow: ["lat", "chest"], ge: 0.5,
       tm: [2.4, 0.3, 1.4, 0.4], tl: ["Lower behind your head slowly", "", "Pull back over your chest", ""]
     },
     "Close-grip push-up": {
@@ -393,6 +405,64 @@ const FIG = (function () {
       seq: [lw(150, 196), lw(150, 242), lw(196, 242), lw(150, 242)], segT: 0.8, segH: 0.25,
       pf: S => ln(S.lL.j, S.lR.j, 5, C.bandR), glow: ["hipj"],
       tl: ["Step out", "Other foot follows, band stays tight", "Step out", "Other foot follows, band stays tight"]
+    },
+
+    // ---- special day: chest & back focus ----
+    "Dumbbell floor press": {
+      // palms face the feet and the elbows sit 45–60° out, so the upper arm points partly toward you (as/fs foreshorten it)
+      a: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [177, 180], as: 1, fs: 1},
+      b: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [70, 180], as: 0.6, fs: 1.667},
+      pb: () => mat(), pf: S => dbEnd(S.armN.e), glow: ["chest", "arm"], ge: 1,
+      tm: [2.2, 0.3, 1.1, 0.5], tl: ["Lower slowly, elbows at 45°", "", "Press up, squeeze your chest", ""]
+    },
+    "Band chest fly": {
+      // front view, back to the door; yaw swings the arms from out to the sides to in front of the chest
+      v: "f",
+      a: {c: [200, 150], fl: [184, 254], fr: [216, 254], armL: [75, 75], armR: [75, 75], yaw: -6},
+      b: {c: [200, 150], fl: [184, 254], fr: [216, 254], armL: [75, 75], armR: [75, 75], yaw: 104},
+      pb: S => `<rect x="146" y="16" width="108" height="${G - 16}" rx="3" fill="#f1e6da" stroke="#e0cdb8" stroke-width="3"/>` +
+        ln(S.aL.e, [200, 104], 4, C.band) + ln(S.aR.e, [200, 104], 4, C.band),
+      glow: ["chest"], ge: 1,
+      inset: {a: {hip: [204, 153], t: 4, f: [224, 254], f2: [184, 254], arm: [85, 85], hab: 88},
+              b: {hip: [204, 153], t: 4, f: [224, 254], f2: [184, 254], arm: [85, 85], hab: 4},
+              pb: () => `<rect x="40" y="14" width="14" height="${G - 14}" fill="${C.wood}"/><rect x="50" y="98" width="10" height="12" rx="2" fill="${C.prop}"/>`,
+              pf: S => ln([57, 104], S.armN.e, 4, C.band)},
+      tm: [1.4, 0.8, 2.0, 0.4], tl: ["Hands together, like hugging a tree", "Squeeze your chest", "Open slowly to a stretch", ""]
+    },
+
+    // ---- special day: bone builder ----
+    "Jump and land": {
+      seq: [
+        {hip: [198, 152], t: 2, h: -2, f: [203, 254], f2: [197, 254], arm: [6, 2], armFront: true},
+        {hip: [183, 181], t: 28, h: -18, f: [203, 254], f2: [197, 254], arm: [-45, -38], armFront: true},
+        {hip: [200, 128], t: 2, h: 0, f: [206, 232], f2: [200, 232], fa: 62, fa2: 62, arm: [150, 160], armFront: true},
+        {hip: [199, 151], t: 5, h: -3, f: [204, 254], f2: [198, 254], arm: [105, 112], armFront: true},
+        {hip: [185, 176], t: 24, h: -14, f: [203, 254], f2: [197, 254], arm: [72, 80], armFront: true}
+      ],
+      segT: [0.45, 0.2, 0.18, 0.2, 0.6], segH: [0.05, 0.04, 0, 0.9, 0.7],
+      glow: ["thigh", "glute", "calf"],
+      tl: ["Dip, then jump straight up", "Dip, then jump straight up", "Land softly and hold it", "Land softly and hold it", "Stand tall and pause"]
+    },
+    "Floor back extension": {
+      // lying face down with the head to the right; the chest lifts while the legs stay down
+      a: {hip: [150, 247], t: 90, h: 0, leg: [274, 274], leg2: [274, 274], fa: 175, fa2: 175, arm: [272, 272]},
+      b: {hip: [150, 247], t: 72, h: 4, leg: [274, 274], leg2: [274, 274], fa: 175, fa2: 175, arm: [283, 283]},
+      pb: () => mat(), glow: ["back", "glute"], ge: 1,
+      tm: [1.3, 2.0, 1.6, 0.8], tl: ["Lift your chest, shoulder blades back", "Hold 2–3 sec, eyes on the floor", "Lower slowly", ""]
+    },
+    "Lateral lunge": {
+      // front view, wide stance, sitting into one hip then the other; kL/kR shorten the thigh that points toward you
+      v: "f",
+      seq: [
+        {c: [200, 165], fl: [136, 254], fr: [264, 254], fo: 13, hl: [197, 131], hr: [203, 131], al: -1, ar: 1},
+        {c: [232, 200], ts: 0.84, fl: [136, 254], fr: [264, 254], fo: 13, kR: [0.55, 0.95], hl: [229, 176], hr: [235, 176], al: -1, ar: 1},
+        {c: [200, 165], fl: [136, 254], fr: [264, 254], fo: 13, hl: [197, 131], hr: [203, 131], al: -1, ar: 1},
+        {c: [168, 200], ts: 0.84, fl: [136, 254], fr: [264, 254], fo: 13, kL: [0.55, 0.95], hl: [165, 176], hr: [171, 176], al: -1, ar: 1}
+      ],
+      segT: [1.4, 0.9, 1.4, 0.9], segH: [0.25, 0.5, 0.25, 0.5],
+      pf: S => db([(S.aL.e[0] + S.aR.e[0]) / 2, (S.aL.e[1] + S.aR.e[1]) / 2 + 9], 90),
+      glow: ["thigh", "hipj"],
+      tl: ["Sit back into one hip, other leg straight", "Push through your heel to the middle", "Now the other side", "Push through your heel to the middle"]
     }
   };
 
@@ -400,8 +470,13 @@ const FIG = (function () {
   function stateAt(ex, sec) {
     const tl = ex.tl || ["", "", "", ""];
     if (ex.seq) {
-      const n = ex.seq.length, per = ex.segT + ex.segH, t = sec % (n * per), i = Math.floor(t / per);
-      const s = (t - i * per) / ex.segT;
+      // segT/segH: one number for every step, or a list with a time per step (move, then hold)
+      const n = ex.seq.length, at = (v, k) => Array.isArray(v) ? v[k] : v;
+      let total = 0;
+      for (let k = 0; k < n; k++) total += at(ex.segT, k) + at(ex.segH, k);
+      let t = sec % total, i = 0;
+      while (i < n - 1 && t >= at(ex.segT, i) + at(ex.segH, i)) { t -= at(ex.segT, i) + at(ex.segH, i); i++; }
+      const s = t / at(ex.segT, i);
       return {seq: true, i, s: s >= 1 ? 1 : ease(s), label: tl[i] || ""};
     }
     const [t1, h1, t2, h2] = ex.tm || [1.3, 0.4, 1.3, 0.4];

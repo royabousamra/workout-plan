@@ -213,6 +213,18 @@
   .donesum{font-size:15px}
   .done .link{justify-self:center}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:12px;font-weight:600;font-size:14.5px;box-shadow:0 6px 24px rgba(0,0,0,.2);z-index:9;max-width:90vw;text-align:center}
+  /* ---- special days ---- */
+  .spechead{margin:22px 0 10px}
+  .spechead h2{font-size:19px;margin:0;flex:none}
+  .spechead p{color:var(--muted);font-size:14px;margin:2px 0 0}
+  .day.sp{border-color:#cfdcf1}
+  .day.sp:hover{border-color:#3f5f8f}
+  .day.sp .k{color:#3f5f8f}
+  .chip.bone{background:#eef3fb;color:#3f5f8f}
+  .daytip{font-size:14.5px;background:var(--soft);border:1px solid #efc3b6;border-radius:10px;padding:8px 12px;margin:0 0 14px}
+  .about{background:#f6f9fd;border:1px solid #cfdcf1;border-radius:12px;padding:4px 16px 8px;margin-top:16px}
+  .about h3{margin:10px 0 6px}
+  .about .cues li{margin-bottom:8px}
   @media (max-width: 520px){
     .stats{grid-template-columns:1fr 1fr}
     .stats .stat:first-child{grid-column:1/-1}
@@ -221,6 +233,9 @@
   }
   @media (min-width: 900px){
     .days.n4{grid-template-columns:repeat(4,1fr)}
+    .days.sp{grid-template-columns:repeat(2,1fr)}
+    .spechead{display:flex;align-items:baseline;gap:14px}
+    .colR .daytip{margin:10px 0 0;padding:7px 12px}
     .sl .hint{display:inline}
     .histgrid{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);align-items:start}
     .wrow small{flex-basis:auto}
@@ -253,6 +268,12 @@
 
     <div class="days" id="days"></div>
 
+    <div class="spechead">
+      <h2>Special days</h2>
+      <p>Extra workouts for one goal, outside your plan. Do them any time: they count toward your week but don't change your Next up day.</p>
+    </div>
+    <div class="days sp" id="specials"></div>
+
     <div class="homebtns">
       <button class="btn ghost" id="open-history">📅 History &amp; check-ins</button>
       <button class="btn ghost" id="open-checkin">✓ Check in a workout</button>
@@ -267,6 +288,7 @@
         <li><b>Picking weight:</b> choose one where the last 2–3 reps feel hard but your form stays clean.</li>
         <li><b>Moving up:</b> when you hit the top rep number on every set, use heavier dumbbells or a thicker band. Each exercise remembers what you used last time.</li>
         <li><b>Off days:</b> a 20–30 minute walk helps fat loss and recovery. You can check it in as "Other activity".</li>
+        <li><b>Special days:</b> add one on top of your plan, or do it in place of one of your plan's days. Each one explains on its first screen how often to do it.</li>
       </ul>
     </details>
     <details class="info">
@@ -394,6 +416,13 @@ const FIG = (function () {
     const j = [sh[0] + u[0] * L.ua * s, sh[1] + u[1] * L.ua * s];
     return {j, e: [j[0] + f[0] * L.fa * s * k, j[1] + f[1] * L.fa * s * k]};
   }
+  // front/rear arm swinging forward around the body (a chest fly): only the sideways part shrinks,
+  // k = cos(yaw) goes from 1 (out to the side) through 0 (pointing at the viewer) to negative (crossing in front)
+  function fkYaw(sh, angs, dir, k) {
+    const u = dir(angs[0]), f = dir(angs[1]);
+    const j = [sh[0] + u[0] * L.ua * k, sh[1] + u[1] * L.ua];
+    return {j, e: [j[0] + f[0] * L.fa * k, j[1] + f[1] * L.fa]};
+  }
   // legs posed by joint angles: [thigh, shin], same angle convention as the arms
   function fkLeg(hp, angs, dir) {
     const u = dir(angs[0]), f = dir(angs[1]);
@@ -438,7 +467,8 @@ const FIG = (function () {
     if (o.arm && !o.arm2) o.arm2 = o.arm;
     return o;
   }
-  const normFront = P => Object.assign({ts: 1, bl: -1, br: 1, al: -1, ar: 1, as: 1, fo: 12, sx: 0, hx: 0, hy: 0}, P);
+  // kL/kR: [thigh, shin] length scale for a leg pointing partly toward the viewer (front view)
+  const normFront = P => Object.assign({ts: 1, bl: -1, br: 1, al: -1, ar: 1, as: 1, fo: 12, sx: 0, hx: 0, hy: 0, kL: [1, 1], kR: [1, 1]}, P);
   function mix(a, b, u) {
     if (typeof a === "number") return lerp(a, b, u);
     if (Array.isArray(a)) return a.map((v, i) => mix(v, b[i], u));
@@ -471,8 +501,8 @@ const FIG = (function () {
     const legN = P.leg ? fkLeg(hip, P.leg, dS) : ik(hip, P.f, L.th, L.sh, P.lb);
     const legF = P.leg2 ? fkLeg(hip, P.leg2, dS) : ik(hip, P.f2, L.th, L.sh, P.lb);
     const as = P.hab != null ? Math.max(0.03, Math.cos(rad(P.hab))) : P.as;   // arm swinging toward the viewer looks shorter
-    const armN = P.arm ? fk(sh, P.arm, dS, as) : ik(sh, P.hd, L.ua * as, L.fa * as, P.ab);
-    const armF = P.arm2 ? fk(sh, P.arm2, dS, as) : ik(sh, P.hd2, L.ua * as, L.fa * as, P.ab);
+    const armN = P.arm ? fk(sh, P.arm, dS, as, P.fs) : ik(sh, P.hd, L.ua * as, L.fa * as, P.ab);
+    const armF = P.arm2 ? fk(sh, P.arm2, dS, as, P.fs) : ik(sh, P.hd2, L.ua * as, L.fa * as, P.ab);
     return {hip, sh, head, d, nf, hnf, legN, legF, armN, armF, P};
   }
   function anchorsSide(S) {
@@ -480,7 +510,8 @@ const FIG = (function () {
     return {
       back: [[...al(0.68, -6), 22]], chest: [[...al(0.78, 7), 18]], core: [[...al(0.3, 8), 18]],
       glute: [[...al(0, -8), 19]], thigh: [[...mid(S.hip, S.legN.j, 0.55), 20]], thighF: [[...mid(S.hip, S.legF.j, 0.55), 20]],
-      arm: [[...mid(S.sh, S.armN.j, 0.5), 15]], lat: [[...al(0.6, 0), 24]], delt: [[S.sh[0], S.sh[1], 15]]
+      arm: [[...mid(S.sh, S.armN.j, 0.5), 15]], lat: [[...al(0.6, 0), 24]], delt: [[S.sh[0], S.sh[1], 15]],
+      calf: [[...mid(S.legN.j, S.legN.e, 0.4), 14]]
     };
   }
   function drawSide(ex, P) {
@@ -508,10 +539,12 @@ const FIG = (function () {
     const SW = 22, HW = 12;
     const hl = [c[0] - HW, c[1]], hr = [c[0] + HW, c[1]], sl = [sc[0] - SW, sc[1]], sr = [sc[0] + SW, sc[1]];
     const head = [sc[0] + P.hx, sc[1] - (L.nk + L.hd) * (0.55 + 0.45 * s) + P.hy];
-    const lL = P.lgL ? fkLeg(hl, P.lgL, dL) : ik(hl, P.fl, L.th, L.sh, P.bl), lR = ik(hr, P.fr, L.th, L.sh, P.br);
+    const lL = P.lgL ? fkLeg(hl, P.lgL, dL) : ik(hl, P.fl, L.th * P.kL[0], L.sh * P.kL[1], P.bl);
+    const lR = ik(hr, P.fr, L.th * P.kR[0], L.sh * P.kR[1], P.br);
     const as = P.hab != null ? Math.max(0.03, Math.sin(rad(P.hab))) : P.as;
-    const aL = P.armL ? fk(sl, P.armL, dL, as) : ik(sl, P.hl, L.ua * as, L.fa * as, P.al);
-    const aR = P.armR ? fk(sr, P.armR, dR, as, P.fsR) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
+    const yk = P.yaw != null ? Math.cos(rad(P.yaw)) : null;
+    const aL = P.armL ? (yk != null ? fkYaw(sl, P.armL, dL, yk) : fk(sl, P.armL, dL, as)) : ik(sl, P.hl, L.ua * as, L.fa * as, P.al);
+    const aR = P.armR ? (yk != null ? fkYaw(sr, P.armR, dR, yk) : fk(sr, P.armR, dR, as, P.fsR)) : ik(sr, P.hr, L.ua * as, L.fa * as, P.ar);
     return {c, sc, hl, hr, sl, sr, head, lL, lR, aL, aR, P};
   }
   function anchorsFront(S) {
@@ -521,6 +554,7 @@ const FIG = (function () {
       thigh: [[...mid(S.hl, S.lL.j, 0.55), 19], [...mid(S.hr, S.lR.j, 0.55), 19]],
       hipj: [[S.hl[0] - 4, S.hl[1], 17], [S.hr[0] + 4, S.hr[1], 17]],
       upperback: [[S.sc[0], S.sc[1] + 13, 27]],
+      chest: [[S.sc[0] - 11, S.sc[1] + 15, 15], [S.sc[0] + 11, S.sc[1] + 15, 15]],
       innerL: [[mid(S.hl, S.lL.j, 0.5)[0] + 8, mid(S.hl, S.lL.j, 0.5)[1], 15]],
       oblique: [[...mid(S.sr, S.hr, 0.55), 17]]
     };
@@ -642,7 +676,7 @@ const FIG = (function () {
       b: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [262, 270]},
       pb: () => mat(),
       pf: S => { const e = S.armN.e, a = rad(angOf(S.armN.j, e)); return db([e[0] + Math.cos(a) * 9, e[1] + Math.sin(a) * 9], a * 180 / Math.PI); },
-      glow: ["lat"], ge: 0.5,
+      glow: ["lat", "chest"], ge: 0.5,
       tm: [2.4, 0.3, 1.4, 0.4], tl: ["Lower behind your head slowly", "", "Pull back over your chest", ""]
     },
     "Close-grip push-up": {
@@ -756,6 +790,64 @@ const FIG = (function () {
       seq: [lw(150, 196), lw(150, 242), lw(196, 242), lw(150, 242)], segT: 0.8, segH: 0.25,
       pf: S => ln(S.lL.j, S.lR.j, 5, C.bandR), glow: ["hipj"],
       tl: ["Step out", "Other foot follows, band stays tight", "Step out", "Other foot follows, band stays tight"]
+    },
+
+    // ---- special day: chest & back focus ----
+    "Dumbbell floor press": {
+      // palms face the feet and the elbows sit 45–60° out, so the upper arm points partly toward you (as/fs foreshorten it)
+      a: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [177, 180], as: 1, fs: 1},
+      b: {hip: [262, 248], t: -90, h: 0, f: [290, 254], arm: [70, 180], as: 0.6, fs: 1.667},
+      pb: () => mat(), pf: S => dbEnd(S.armN.e), glow: ["chest", "arm"], ge: 1,
+      tm: [2.2, 0.3, 1.1, 0.5], tl: ["Lower slowly, elbows at 45°", "", "Press up, squeeze your chest", ""]
+    },
+    "Band chest fly": {
+      // front view, back to the door; yaw swings the arms from out to the sides to in front of the chest
+      v: "f",
+      a: {c: [200, 150], fl: [184, 254], fr: [216, 254], armL: [75, 75], armR: [75, 75], yaw: -6},
+      b: {c: [200, 150], fl: [184, 254], fr: [216, 254], armL: [75, 75], armR: [75, 75], yaw: 104},
+      pb: S => `<rect x="146" y="16" width="108" height="${G - 16}" rx="3" fill="#f1e6da" stroke="#e0cdb8" stroke-width="3"/>` +
+        ln(S.aL.e, [200, 104], 4, C.band) + ln(S.aR.e, [200, 104], 4, C.band),
+      glow: ["chest"], ge: 1,
+      inset: {a: {hip: [204, 153], t: 4, f: [224, 254], f2: [184, 254], arm: [85, 85], hab: 88},
+              b: {hip: [204, 153], t: 4, f: [224, 254], f2: [184, 254], arm: [85, 85], hab: 4},
+              pb: () => `<rect x="40" y="14" width="14" height="${G - 14}" fill="${C.wood}"/><rect x="50" y="98" width="10" height="12" rx="2" fill="${C.prop}"/>`,
+              pf: S => ln([57, 104], S.armN.e, 4, C.band)},
+      tm: [1.4, 0.8, 2.0, 0.4], tl: ["Hands together, like hugging a tree", "Squeeze your chest", "Open slowly to a stretch", ""]
+    },
+
+    // ---- special day: bone builder ----
+    "Jump and land": {
+      seq: [
+        {hip: [198, 152], t: 2, h: -2, f: [203, 254], f2: [197, 254], arm: [6, 2], armFront: true},
+        {hip: [183, 181], t: 28, h: -18, f: [203, 254], f2: [197, 254], arm: [-45, -38], armFront: true},
+        {hip: [200, 128], t: 2, h: 0, f: [206, 232], f2: [200, 232], fa: 62, fa2: 62, arm: [150, 160], armFront: true},
+        {hip: [199, 151], t: 5, h: -3, f: [204, 254], f2: [198, 254], arm: [105, 112], armFront: true},
+        {hip: [185, 176], t: 24, h: -14, f: [203, 254], f2: [197, 254], arm: [72, 80], armFront: true}
+      ],
+      segT: [0.45, 0.2, 0.18, 0.2, 0.6], segH: [0.05, 0.04, 0, 0.9, 0.7],
+      glow: ["thigh", "glute", "calf"],
+      tl: ["Dip, then jump straight up", "Dip, then jump straight up", "Land softly and hold it", "Land softly and hold it", "Stand tall and pause"]
+    },
+    "Floor back extension": {
+      // lying face down with the head to the right; the chest lifts while the legs stay down
+      a: {hip: [150, 247], t: 90, h: 0, leg: [274, 274], leg2: [274, 274], fa: 175, fa2: 175, arm: [272, 272]},
+      b: {hip: [150, 247], t: 72, h: 4, leg: [274, 274], leg2: [274, 274], fa: 175, fa2: 175, arm: [283, 283]},
+      pb: () => mat(), glow: ["back", "glute"], ge: 1,
+      tm: [1.3, 2.0, 1.6, 0.8], tl: ["Lift your chest, shoulder blades back", "Hold 2–3 sec, eyes on the floor", "Lower slowly", ""]
+    },
+    "Lateral lunge": {
+      // front view, wide stance, sitting into one hip then the other; kL/kR shorten the thigh that points toward you
+      v: "f",
+      seq: [
+        {c: [200, 165], fl: [136, 254], fr: [264, 254], fo: 13, hl: [197, 131], hr: [203, 131], al: -1, ar: 1},
+        {c: [232, 200], ts: 0.84, fl: [136, 254], fr: [264, 254], fo: 13, kR: [0.55, 0.95], hl: [229, 176], hr: [235, 176], al: -1, ar: 1},
+        {c: [200, 165], fl: [136, 254], fr: [264, 254], fo: 13, hl: [197, 131], hr: [203, 131], al: -1, ar: 1},
+        {c: [168, 200], ts: 0.84, fl: [136, 254], fr: [264, 254], fo: 13, kL: [0.55, 0.95], hl: [165, 176], hr: [171, 176], al: -1, ar: 1}
+      ],
+      segT: [1.4, 0.9, 1.4, 0.9], segH: [0.25, 0.5, 0.25, 0.5],
+      pf: S => db([(S.aL.e[0] + S.aR.e[0]) / 2, (S.aL.e[1] + S.aR.e[1]) / 2 + 9], 90),
+      glow: ["thigh", "hipj"],
+      tl: ["Sit back into one hip, other leg straight", "Push through your heel to the middle", "Now the other side", "Push through your heel to the middle"]
     }
   };
 
@@ -763,8 +855,13 @@ const FIG = (function () {
   function stateAt(ex, sec) {
     const tl = ex.tl || ["", "", "", ""];
     if (ex.seq) {
-      const n = ex.seq.length, per = ex.segT + ex.segH, t = sec % (n * per), i = Math.floor(t / per);
-      const s = (t - i * per) / ex.segT;
+      // segT/segH: one number for every step, or a list with a time per step (move, then hold)
+      const n = ex.seq.length, at = (v, k) => Array.isArray(v) ? v[k] : v;
+      let total = 0;
+      for (let k = 0; k < n; k++) total += at(ex.segT, k) + at(ex.segH, k);
+      let t = sec % total, i = 0;
+      while (i < n - 1 && t >= at(ex.segT, i) + at(ex.segH, i)) { t -= at(ex.segT, i) + at(ex.segH, i); i++; }
+      const s = t / at(ex.segT, i);
       return {seq: true, i, s: s >= 1 ? 1 : ease(s), label: tl[i] || ""};
     }
     const [t1, h1, t2, h2] = ex.tm || [1.3, 0.4, 1.3, 0.4];
@@ -937,7 +1034,51 @@ const EX = {
   "Farmer's march": {img:"Farmers_Walk", vq:"farmers carry march in place dumbbells", vid:"T8CUVlNGlK4", focus:["Grip","Upper back","Core","Legs"], cap:["Pick up","Hold"],
     photo:"The photo shows a walking carry. Marching in place works the same muscles and fits in a small space.",
     cues:["Pick up a dumbbell in each hand by bending your knees and hips, not rounding your back.","Stand tall: shoulders back and down, ribs down, eyes forward.","March in place, lifting one knee at a time. Don't lean or let the weights swing.","Keep breathing. Put the weights down the same way you picked them up."],
-    easier:"Use lighter dumbbells, march slowly, or just hold the weights while standing tall."}
+    easier:"Use lighter dumbbells, march slowly, or just hold the weights while standing tall."},
+
+  // ---- special days ----
+  "Dumbbell floor press": {img:"Dumbbell_Floor_Press", vq:"dumbbell floor press form", vid:"T0Y3OBF1bNI", focus:["Chest","Front shoulders","Triceps"],
+    photo:null,
+    cues:["Lie on your back with knees bent and feet flat. Hold a dumbbell in each hand straight above your chest, palms facing your feet.",
+      "Lower slowly until your upper arms rest on the floor, elbows about 45° out from your sides (not straight out in a T).",
+      "Pause lightly, then press up and slightly in until the dumbbells are back over your chest.",
+      "Squeeze your chest at the top. Keep your wrists straight and stacked over your elbows."],
+    easier:"Use lighter dumbbells, or press one arm at a time while the other holds its dumbbell up."},
+  "Dumbbell pullover": {img:null, vq:"dumbbell pullover on floor", vid:"tM-RjVia9AY", focus:["Lats (under the bra line)","Chest","Side of the ribs","Triceps"],
+    photo:null,
+    cues:["Lie on your back with knees bent. Hold one dumbbell with both hands cupped under the top end, arms straight up over your chest.",
+      "Keep a slight bend in your elbows and your lower back gently pressed toward the floor.",
+      "Slowly lower the dumbbell back over your head until it's just above the floor, or until you feel a stretch along your sides.",
+      "Pull it back over your chest by squeezing your lats and chest, without bending your elbows more."],
+    easier:"Use a lighter dumbbell and only lower it halfway, to where your ribs stay down."},
+  "Band chest fly": {img:null, vq:"resistance band chest fly door anchor", vid:"7l8HfDNXY6E", focus:["Chest","Front shoulders"],
+    photo:null,
+    cues:["Set your door anchor at chest height, close the door fully and tug-test it. Hold a handle in each hand and stand facing away from the door.",
+      "Step forward until the band is a little tight, one foot ahead of the other. Open your arms out to the sides at chest height, elbows slightly bent.",
+      "Bring your hands together in front of your chest in a wide arc, like hugging a big tree. Squeeze your chest for 1 second.",
+      "Open your arms slowly until you feel a stretch across your chest. Keep the same small elbow bend the whole time."],
+    easier:"Stand closer to the door or use a lighter band, or do one arm at a time. You need a long tube band with handles; mini loops are too short."},
+  "Jump and land": {img:null, vq:"jump landing technique soft landing", vid:"AzZLYpEc93E", focus:["Glutes","Quads","Calves","Balance"],
+    photo:null,
+    cues:["Wear supportive shoes and jump on a firm floor, not a thick mat or rug. Stand with your feet hip-width apart.",
+      "Dip into a quarter squat as you swing your arms back, then jump straight up. A few inches off the floor is plenty.",
+      "Land on the balls of your feet, then your heels, with soft knees over your toes. Hold the landing for a second.",
+      "Stand tall and pause for a couple of seconds before the next jump, so every landing is controlled."],
+    easier:"Heel drops: rise up onto your toes, then drop onto your heels with a firm thud. Hold a counter for balance. Same number of reps."},
+  "Floor back extension": {img:null, vq:"prone back extension floor osteoporosis", vid:"QWHUeFKzgOo", focus:["Back muscles along the spine","Glutes","Posture"],
+    photo:null,
+    cues:["Lie face down with your legs straight and your arms by your sides, palms down. A folded towel under your hips can make it more comfortable.",
+      "Squeeze your glutes and tuck your chin slightly, eyes on the floor.",
+      "Lift your head, shoulders and chest a few inches, drawing your shoulder blades back and down. Keep your legs on the floor.",
+      "Hold 2–3 seconds, then lower slowly. Once it's easy, bend your arms into a W beside your shoulders and lift them too."],
+    easier:"Lift only your head and shoulders an inch or two, or do bird dogs on your hands and knees instead."},
+  "Lateral lunge": {img:null, vq:"goblet lateral lunge form", vid:"dGdtmVq9RNc", focus:["Glutes","Inner thighs","Quads","Balance"],
+    photo:null,
+    cues:["Stand with your feet about twice shoulder-width apart, toes forward or turned out slightly. Hold one dumbbell upright against your chest.",
+      "Push your hips back and bend one knee, shifting your weight over that foot. Keep the other leg straight and both feet flat.",
+      "Sit as low as is comfortable, chest up, with your bent knee pointing over your toes.",
+      "Push through that heel to come back to the middle, then do the other side."],
+    easier:"Use no weight, sit only partway down, and hold the back of a chair in front of you for balance."}
 };
 
 const WARM = {warm:true, title:"Warm-up (5 minutes)", cues:[
@@ -946,8 +1087,22 @@ const WARM = {warm:true, title:"Warm-up (5 minutes)", cues:[
   "Do 10 slow bodyweight squats.",
   "Do 10 light band pull-aparts.",
   "Do 5 cat-cow stretches on hands and knees."]};
+const WARM_UPPER = {warm:true, title:"Warm-up (5 minutes)", cues:[
+  "March in place for 1 minute, swinging your arms.",
+  "Do 10 arm circles forward and 10 backward.",
+  "Do 10 light band pull-aparts.",
+  "Do 8 wall slides: stand with your back and arms against a wall, then slowly slide your arms up overhead and back down, keeping them as close to the wall as you can.",
+  "Do 5 cat-cow stretches on hands and knees."]};
+const WARM_BONE = {warm:true, title:"Warm-up (5 minutes)", cues:[
+  "March in place for 2 minutes, lifting your knees a little higher as you go.",
+  "Do 10 slow bodyweight squats.",
+  "Do 10 hip hinges: hands on hips, push your hips back with a flat back, then stand tall.",
+  "Do 10 calf raises, then 5 tiny hops in place to practice landing softly.",
+  "Do 10 arm circles forward and 10 backward."]};
 
-// The two programs. "sets" is the number of check buttons.
+// The two programs (plus the special days). "sets" is the number of check buttons.
+// Optional step fields: rest = [after A, after B] for a pair, how = text for an unpaired step,
+// tip = a note for this day, bone = what the move loads (bone day), wkey = separate "what you used" memory.
 const PROGRAMS = {
   "3": {name:"3-Day", schedule:"for example Mon / Wed / Fri", days:[
     {key:"Day 1", title:"Full body A", sub:"Squat, row, push, hinge, arms", steps:[
@@ -1008,9 +1163,58 @@ const PROGRAMS = {
       {label:"3A", ex:"Dumbbell thruster", dose:"3 × 10–12", sets:3, with:"3B"},
       {label:"3B", ex:"Single-leg glute bridge", dose:"3 × 10 per side", sets:3, with:"3A"},
       {label:"Finisher", ex:"Bird dog", dose:"2 × 8 per side", sets:2}]}
+  ]},
+  // Special days sit outside the rotation: they're logged as workouts (so they count toward the week)
+  // under their own key "s", so they never change "Next up" and can't be picked as the program.
+  "s": {name:"Special", special:true, days:[
+    {key:"Upper body", title:"Chest & back focus", sub:"Chest, the bra-line back, under the arms and posture", warm:WARM_UPPER, about:[
+      "<b>What it works:</b> every muscle under the bra line. The chest in front, the lats and mid-back behind, the muscle along the side of your ribs under your arm, and the backs of your shoulders.",
+      "<b>The honest part:</b> no exercise burns fat off one spot. Where fat comes off first is mostly down to your genes, and overall fat loss (your eating, your plan and your walks) is what shrinks this area. What this day adds is firmer muscle underneath and shoulders that sit back, so the area looks smoother and more lifted as the fat goes.",
+      "<b>When:</b> once a week, on top of your plan or in place of one of its days. If your back or arms are still sore from an upper-body workout, wait a day.",
+      "<b>How:</b> lower slowly and hold each squeeze for 1–2 seconds. When you reach the top of the rep range on every set, go up in weight or band."
+    ], steps:[
+      {label:"1A", ex:"Dumbbell floor press", dose:"3 × 8–12", sets:3, with:"1B"},
+      {label:"1B", ex:"Band lat pulldown", dose:"3 × 10–12", sets:3, with:"1A",
+        tip:"<b>The main muscle under your bra strap.</b> Pull your elbows down into your sides and hold the squeeze for 2 seconds."},
+      {label:"2A", ex:"Dumbbell pullover", dose:"3 × 10–12", sets:3, with:"2B",
+        tip:"<b>Front and back of the bra line in one move:</b> chest, lats and the muscle along the side of your ribs."},
+      {label:"2B", ex:"Staggered-stance one-arm row", dose:"3 × 10–12 per side", sets:3, with:"2A",
+        tip:"<b>Pull toward your hip, not your armpit.</b> Driving the elbow back past your ribs works the lat, the bra-line muscle, more than the upper back."},
+      {label:"3A", ex:"Band chest fly", dose:"3 × 12–15", sets:3, with:"3B",
+        tip:"<b>Move your door anchor down to chest height</b> for this one."},
+      {label:"3B", ex:"Reverse fly", dose:"3 × 12–15", sets:3, with:"3A",
+        tip:"<b>Posture muscles.</b> Strong rear shoulders and mid-back hold your shoulders back, which lifts your chest in front and smooths the bra line behind."},
+      {label:"Finisher", ex:"Knee push-up", dose:"2 × as many as you can", sets:2,
+        how:"Do as many clean reps as you can, rest 60 seconds, then go again. End a set when your hips start to sag.",
+        tip:"<b>Push the floor away at the top</b> so your shoulder blades spread apart. That works the muscle along the side of your ribs, under your arm."}]},
+    {key:"GLP-1", title:"Bone builder", sub:"Heavier lifts, jumps and back strength to protect bone density on a GLP-1", warm:WARM_BONE, about:[
+      "<b>Why:</b> losing weight fast, including on a GLP-1, takes some muscle and bone along with the fat, mostly at the hips and spine. Bone stays strong when it's loaded, and heavy lifting and quick impacts like jumping are the strongest signals you can give it. In a 2024 trial, people taking a GLP-1 alone lost more hip and spine bone than people who exercised, and combining the two kept bone density steady.",
+      "<b>How:</b> go heavier than on your plan's days. Pick weights where 6–8 reps is all you can do with clean form. Lower with control, come up fast, and rest longer between rounds.",
+      "<b>When:</b> 1–2 times a week, on top of your plan or in place of one of its days, with a day off from heavy leg work after it. The jumps alone (3 × 10) take two minutes and are good on most days.",
+      "<b>Safety:</b> if you've been told you have osteoporosis, or you've broken a bone in a minor fall, check with your doctor or a physical therapist before the jumps and heavy lifts. On low-appetite days, eat something with protein beforehand, sip water, and stop if you feel dizzy or shaky.",
+      "<b>Food:</b> muscle and bone need building blocks. Eat protein at every meal, and ask your doctor about calcium, vitamin D and whether a bone density (DEXA) scan makes sense for you."
+    ], steps:[
+      {label:"1A", ex:"Jump and land", dose:"3 × 10 jumps", sets:3, with:"1B", bone:"Hips & spine",
+        tip:"<b>Impact is a strong signal for bone.</b> Small jumps with soft, controlled landings are enough. Do the heel drops (below) instead if you have osteoporosis or sore joints, or if you leak a little when you jump."},
+      {label:"1B", ex:"Floor back extension", dose:"3 × 8–10", sets:3, with:"1A", bone:"Spine",
+        tip:"<b>Strong back muscles support your spine</b> and help you stand tall. Small and slow: it isn't about how high you lift."},
+      {label:"2A", ex:"Goblet squat", dose:"3 × 6–8 heavy", sets:3, with:"2B", rest:["60 sec", "90 sec–2 min"], bone:"Hips & spine", wkey:"Goblet squat (heavy)",
+        tip:"<b>Heavier than your plan days:</b> rep 8 should be hard. Lower in 2–3 seconds, then stand up fast. If your heaviest dumbbell is too easy, pause for 3 seconds at the bottom of each rep."},
+      {label:"2B", ex:"Dumbbell overhead press", dose:"3 × 6–8 heavy", sets:3, with:"2A", rest:["60 sec", "90 sec–2 min"], bone:"Spine & wrists", wkey:"Dumbbell overhead press (heavy)",
+        tip:"<b>Go heavy:</b> pressing overhead loads your spine and arms, which is the point today. Stand tall with your ribs down and glutes squeezed."},
+      {label:"3A", ex:"Dumbbell Romanian deadlift", dose:"3 × 6–8 heavy", sets:3, with:"3B", rest:["60 sec", "90 sec–2 min"], bone:"Hips & spine", wkey:"Dumbbell Romanian deadlift (heavy)",
+        tip:"<b>Your heaviest lift today.</b> Use your heaviest dumbbells, or add the platform band on top. Lower with control, then squeeze your glutes to stand up fast."},
+      {label:"3B", ex:"Lateral lunge", dose:"3 × 6–8 per side", sets:3, with:"3A", rest:["60 sec", "90 sec–2 min"], bone:"Hips",
+        tip:"<b>Side-to-side loads your hips from a new direction,</b> which bone responds to. Hold your goblet squat dumbbell if you can."},
+      {label:"Finisher", ex:"Farmer's march", dose:"3 × 30–45 sec heavy", sets:3, bone:"Hips, spine & grip", wkey:"Farmer's march (heavy)",
+        how:"Rest 60 seconds between rounds.",
+        tip:"<b>Carry the heaviest dumbbells you can hold</b> for 30 seconds while standing tall. Heavy carries load your hips, spine and grip."}]}
   ]}
 };
-Object.values(PROGRAMS).forEach(p => p.days.forEach(d => d.steps.unshift(WARM)));
+Object.values(PROGRAMS).forEach(p => p.days.forEach(d => d.steps.unshift(d.warm || WARM)));
+const SPECIAL = "s";
+// "3-Day Day 1: Full body A" for plan days, "Special day: Bone builder" for special days
+function dayName(pk, i){ const p = PROGRAMS[pk], d = p.days[i]; return p.special ? "Special day: " + d.title : p.name + " " + d.key + ": " + d.title; }
 
 const FEELS = [["easy","😌 Easy"],["good","💪 Just right"],["hard","🥵 Hard"]];
 const FEEL_TXT = Object.fromEntries(FEELS);
@@ -1024,7 +1228,7 @@ let storageOK = true;
 function blankState(){ return {v:1, program:"3", active:null, log:[], last:{}, del:{}, upd:0, wipedAt:0}; }
 function normState(raw){
   const s = Object.assign(blankState(), raw);
-  if (!PROGRAMS[s.program]) s.program = "3";
+  if (!PROGRAMS[s.program] || PROGRAMS[s.program].special) s.program = "3";
   if (!Array.isArray(s.log)) s.log = [];
   s.log = s.log.filter(e => e && e.id && e.date);
   if (!s.last || typeof s.last !== "object") s.last = {};
@@ -1095,14 +1299,18 @@ function confirmTwice(btn, label, fn){
 }
 
 // ---------- player state ----------
-let day = null, idx = 0, animCtl = null, view = "home";
+// dayProg: which program the open workout comes from (the chosen plan, or SPECIAL)
+let day = null, dayProg = null, idx = 0, animCtl = null, view = "home";
 const WIDE = window.matchMedia ? matchMedia("(min-width: 900px)") : {matches: false};
 const A = () => S.active;      // the workout in progress
+const curDay = () => PROGRAMS[dayProg].days[day];
 
-function startDay(i){
+function startDay(i, pk){
+  pk = pk || S.program;
   const a = A();
-  if (a && a.prog === S.program && a.day === i){ day = i; idx = Math.min(a.idx || 0, prog().days[i].steps.length); }
-  else { S.active = {prog:S.program, day:i, idx:0, sets:{}, weights:{}, started:Date.now()}; day = i; idx = 0; save(); }
+  if (a && a.prog === pk && a.day === i) idx = Math.max(0, Math.min(a.idx || 0, PROGRAMS[pk].days[i].steps.length));
+  else { S.active = {prog:pk, day:i, idx:0, sets:{}, weights:{}, started:Date.now()}; idx = 0; save(); }
+  dayProg = pk; day = i;
   show();
 }
 function setView(v){
@@ -1111,7 +1319,7 @@ function setView(v){
   if (v !== "player" && animCtl){ animCtl.destroy(); animCtl = null; }
   window.scrollTo(0, 0);
 }
-function home(){ day = null; history.replaceState(null, "", location.pathname); renderHome(); setView("home"); }
+function home(){ day = null; dayProg = null; history.replaceState(null, "", location.pathname); renderHome(); setView("home"); }
 
 // ---------- home ----------
 function nextUpDay(){
@@ -1142,10 +1350,11 @@ function renderHome(){
   if (a){
     const ap = PROGRAMS[a.prog], d = ap.days[a.day], tot = d.steps.length - 1, at = Math.min(a.idx, tot);
     const done = Object.values(a.sets).filter(Boolean).length;
-    r.innerHTML = `<div><b>Workout in progress:</b> ${esc(ap.name)} ${esc(d.key)}, ${esc(d.title)} &middot; ${at === 0 ? "warm-up" : "exercise " + Math.min(at, tot) + " of " + tot} &middot; ${done} set${done === 1 ? "" : "s"} ticked</div>` +
+    const what = ap.special ? esc(d.title) + " (special day)" : esc(ap.name) + " " + esc(d.key) + ", " + esc(d.title);
+    r.innerHTML = `<div><b>Workout in progress:</b> ${what} &middot; ${at === 0 ? "warm-up" : "exercise " + Math.min(at, tot) + " of " + tot} &middot; ${done} set${done === 1 ? "" : "s"} ticked</div>` +
       `<div class="rbtns"><button class="btn primary" id="r-go">Continue</button><button class="btn ghost" id="r-drop">Discard</button></div>`;
     r.hidden = false;
-    $("r-go").onclick = () => { if (S.program !== a.prog){ S.program = a.prog; save(); } startDay(a.day); };
+    $("r-go").onclick = () => { if (!ap.special && S.program !== a.prog){ S.program = a.prog; save(); } startDay(a.day, a.prog); };
     $("r-drop").onclick = function(){ confirmTwice(this, "Tap again to discard", () => { S.active = null; save(); renderHome(); }); };
   } else r.hidden = true;
 
@@ -1177,6 +1386,19 @@ function renderHome(){
     b.onclick = () => startDay(i);
     daysEl.appendChild(b);
   });
+
+  // special day cards
+  const spEl = $("specials"); spEl.innerHTML = "";
+  PROGRAMS[SPECIAL].days.forEach((d, i) => {
+    const last = sortedLog().find(e => e.kind === "workout" && e.prog === SPECIAL && e.day === i);
+    const badge = a && a.prog === SPECIAL && a.day === i ? `<span class="badge prog">In progress</span>` : "";
+    const b = document.createElement("button");
+    b.className = "day sp";
+    b.innerHTML = `<div class="k">Special day &middot; ${d.key}${badge}</div><div class="t">${d.title}</div><div class="m">${d.sub} &middot; ${d.steps.length - 1} exercises + warm-up</div>` +
+      `<div class="lastdone">${last ? "Last done: " + niceDate(last.date) : "Not done yet"}</div>`;
+    b.onclick = () => startDay(i, SPECIAL);
+    spEl.appendChild(b);
+  });
 }
 document.querySelectorAll("#progseg button").forEach(b => b.onclick = () => {
   if (S.program === b.dataset.prog) return;
@@ -1196,8 +1418,13 @@ function fillCheckinForm(dateStr){
   $("ci-date").value = dateStr || today(); $("ci-date").max = today();
   const sel = $("ci-what"); sel.innerHTML = "";
   const nu = nextUpDay();
-  prog().days.forEach((d, i) => { const o = document.createElement("option"); o.value = "d" + i; o.textContent = d.key + ": " + d.title; if (i === nu) o.selected = true; sel.appendChild(o); });
-  const o = document.createElement("option"); o.value = "other"; o.textContent = "Other activity (walk, class, sport)"; sel.appendChild(o);
+  const group = label => { const g = document.createElement("optgroup"); g.label = label; sel.appendChild(g); return g; };
+  const opt = (g, v, t, on) => { const o = document.createElement("option"); o.value = v; o.textContent = t; if (on) o.selected = true; g.appendChild(o); };
+  const gp = group(prog().name + " plan");
+  prog().days.forEach((d, i) => opt(gp, "d" + i, d.key + ": " + d.title, i === nu));
+  const gs = group("Special days");
+  PROGRAMS[SPECIAL].days.forEach((d, i) => opt(gs, "s" + i, d.title));
+  opt(group("Something else"), "other", "Other activity (walk, class, sport)");
   $("ci-note").value = "";
   ciFeel = "good"; renderFeel($("ci-feel"), () => ciFeel, v => ciFeel = v);
 }
@@ -1248,7 +1475,7 @@ $("ci-save").onclick = () => {
   if (date > today()){ toast("That date is in the future"); return; }
   const e = {id:newId(), date, at:Date.now(), feel:ciFeel, note:$("ci-note").value.trim()};
   if (what === "other") Object.assign(e, {kind:"other", title:"Other activity"});
-  else { const i = +what.slice(1), d = prog().days[i]; Object.assign(e, {kind:"workout", prog:S.program, day:i, title:prog().name + " " + d.key + ": " + d.title}); }
+  else { const pk = what[0] === "s" ? SPECIAL : S.program, i = +what.slice(1); Object.assign(e, {kind:"workout", prog:pk, day:i, title:dayName(pk, i)}); }
   S.log.push(e); save();
   calMonth = new Date(parseYmd(date).getFullYear(), parseYmd(date).getMonth(), 1);
   renderHistory(); fillCheckinForm(); toast("Checked in ✓");
@@ -1493,7 +1720,7 @@ window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = set
 function cueList(a){ return "<ul class='cues'>" + a.map(c => "<li>" + c + "</li>").join("") + "</ul>"; }
 
 function renderDone(){
-  const a = A(), d = prog().days[day];
+  const a = A(), d = curDay();
   let total = 0; d.steps.forEach(s => total += s.sets || 0);
   const done = Object.values(a.sets).filter(Boolean).length;
   a.feel = a.feel || "good";
@@ -1511,7 +1738,7 @@ function renderDone(){
   $("dn-save").onclick = () => {
     const date = $("dn-date").value && $("dn-date").value <= today() ? $("dn-date").value : today();
     const weights = {}; Object.entries(a.weights || {}).forEach(([k, v]) => { if (v && v.trim()){ weights[k] = v.trim(); S.last[k] = {w:v.trim(), date, at:Date.now()}; } });
-    S.log.push({id:newId(), kind:"workout", date, at:Date.now(), prog:S.program, day, title:prog().name + " " + d.key + ": " + d.title,
+    S.log.push({id:newId(), kind:"workout", date, at:Date.now(), prog:dayProg, day, title:dayName(dayProg, day),
                 done, total, feel:a.feel, note:$("dn-note").value.trim(), weights});
     S.active = null; save(); home(); toast("Checked in ✓ Nice work!");
   };
@@ -1519,10 +1746,10 @@ function renderDone(){
 }
 
 function show(){
-  const d = prog().days[day], total = d.steps.length, a = A();
+  const d = curDay(), total = d.steps.length, a = A();
   setView("player");
-  $("day-name").textContent = prog().name + " " + d.key + ": " + d.title;
-  history.replaceState(null, "", "#p" + S.program + "-d" + (day + 1) + "-" + (idx + 1));
+  $("day-name").textContent = dayName(dayProg, day);
+  history.replaceState(null, "", "#p" + dayProg + "-d" + (day + 1) + "-" + (idx + 1));
   a.idx = idx; save();
   const finished = idx >= total;
   $("card").hidden = finished; $("done").hidden = !finished;
@@ -1532,16 +1759,19 @@ function show(){
 
   const s = d.steps[idx];
   $("count").textContent = idx === 0 ? "Warm-up, then " + (total - 1) + " exercises" : `Exercise ${idx} of ${total - 1}`;
-  let h = "";
+  let h = "", wk = null;     // wk: the key "what you used" is saved under
   if (s.warm){
     h = `<h2>${s.title}</h2><p class="pair">Loosen up before the heavy stuff. Keep it easy.</p>` + cueList(s.cues);
+    if (d.about) h += `<div class="about"><h3>About this day</h3>${cueList(d.about)}</div>`;
     $("card").className = "card warmcard";
   } else {
     const ex = EX[s.ex], imgs = IMG[ex.img] || [], cap = ex.cap || ["Start","Finish"];
-    const hasAnim = FIG.keys.includes(s.ex);
+    const hasAnim = FIG.keys.includes(s.ex), rest = s.rest || ["30 sec", "60–90 sec"];
+    wk = s.wkey || s.ex;
     let head = `<div class="titlerow"><span class="label">${s.label}</span><h2>${s.ex}</h2></div>`;
-    head += s.with ? `<div class="pair">Paired with ${s.with}: do this, rest 30 sec, do ${s.with}, then rest 60–90 sec.</div>` : `<div class="pair">Do this after your pairs are finished.</div>`;
-    head += `<div class="chips"><span class="chip dose">${s.dose}</span>` + ex.focus.map(f => `<span class="chip">${f}</span>`).join("") + `</div>`;
+    head += s.with ? `<div class="pair">Paired with ${s.with}: do this, rest ${rest[0]}, do ${s.with}, then rest ${rest[1]}.</div>` : `<div class="pair">${s.how || "Do this after your pairs are finished."}</div>`;
+    head += `<div class="chips"><span class="chip dose">${s.dose}</span>` + (s.bone ? `<span class="chip bone">🦴 ${s.bone}</span>` : "") + ex.focus.map(f => `<span class="chip">${f}</span>`).join("") + `</div>`;
+    if (s.tip) head += `<div class="daytip">${s.tip}</div>`;
     let media = imgs.length ? `<div class="tabs">` + (hasAnim ? `<button class="tab on" data-tab="anim">Animation</button>` : ``) + `<button class="tab${hasAnim ? "" : " on"}" data-tab="photo">Real photos</button></div>` : `<div class="tabs"><button class="tab on" data-tab="anim">Animation</button><span class="nophoto">No real photos for this one. See the video below.</span></div>`;
     if (hasAnim) media += `<div class="pane" id="pane-anim"><div class="anim" id="anim" title="Tap to pause or play"></div><div class="legend"><span><i class="dot"></i>Red glow = where you should feel it</span><span>Tap to pause</span></div></div>`;
     media += `<div class="pane" id="pane-photo"${hasAnim ? " hidden" : ""}>`;
@@ -1554,14 +1784,14 @@ function show(){
     info += `</div><div class="setrow"><h3>Sets done</h3><div class="sets">`;
     for (let i = 1; i <= s.sets; i++){ const k = idx + "-" + i, on = !!a.sets[k]; info += `<button data-k="${k}" class="${on ? "on" : ""}">${on ? "✓ " : ""}Set ${i}</button>`; }
     info += `</div></div>`;
-    const last = S.last[s.ex], cur = a.weights[s.ex] != null ? a.weights[s.ex] : (last ? last.w : "");
+    const last = S.last[wk], cur = a.weights[wk] != null ? a.weights[wk] : (last ? last.w : "");
     info += `<div class="wrow"><label for="wlog">Used</label><input id="wlog" type="text" maxlength="40" value="${esc(cur)}" placeholder="e.g. 10 lb, green band, on knees">` +
       `<small>${last ? "Last time: <b>" + esc(last.w) + "</b> (" + niceDate(last.date) + ")" : "Saved with your check-in"}</small></div>`;
     const video = `<div class="vrow"><a class="vcard" target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=${ex.vid}"><span class="vthumb"><img src="https://i.ytimg.com/vi/${ex.vid}/hqdefault.jpg" alt="" onerror="this.parentNode.style.display='none'"><span class="play">▶</span></span><span class="vtxt"><b>Watch a tutorial video</b><small>Opens YouTube</small></span></a>` +
       `<a class="more" target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.vq)}">More videos for this exercise</a></div>`;
     h = WIDE.matches ? `<div class="colL">${media}${video}</div><div class="colR">${head}${info}</div>` : head + media + info + video;
     $("card").className = "card split";
-    if (a.weights[s.ex] == null && last) a.weights[s.ex] = last.w;
+    if (a.weights[wk] == null && last) a.weights[wk] = last.w;
   }
   if (animCtl){ animCtl.destroy(); animCtl = null; }
   $("card").innerHTML = h;
@@ -1584,21 +1814,21 @@ function show(){
     b.className = a.sets[k] ? "on" : ""; b.textContent = (a.sets[k] ? "✓ " : "") + n;
   });
   const wl = $("wlog");
-  if (wl) wl.oninput = () => { a.weights[s.ex] = wl.value; clearTimeout(wl.t); wl.t = setTimeout(save, 300); };
+  if (wl) wl.oninput = () => { a.weights[wk] = wl.value; clearTimeout(wl.t); wl.t = setTimeout(save, 300); };
   $("prev").disabled = $("prevT").disabled = idx === 0;
   $("next").textContent = $("nextT").textContent = idx === total - 1 ? "Finish" : "Next";
   window.scrollTo(0, 0);
   fitWide();
 }
 
-const go = n => { const t = prog().days[day].steps.length; idx = Math.max(0, Math.min(t, idx + n)); show(); };
+const go = n => { const t = curDay().steps.length; idx = Math.max(0, Math.min(t, idx + n)); show(); };
 $("next").onclick = $("nextT").onclick = () => go(1);
 $("prev").onclick = $("prevT").onclick = () => go(-1);
 if (WIDE.addEventListener) WIDE.addEventListener("change", () => { if (view === "player" && day !== null) show(); });
 $("back-home").onclick = home;
 document.addEventListener("keydown", e => {
   if (view !== "player" || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-  if (e.key === "ArrowRight" && idx < prog().days[day].steps.length) go(1);
+  if (e.key === "ArrowRight" && idx < curDay().steps.length) go(1);
   if (e.key === "ArrowLeft" && idx > 0) go(-1);
 });
 
@@ -1606,11 +1836,12 @@ document.addEventListener("keydown", e => {
 (function boot(){
   cloudStart();
   const h = location.hash;
-  let m = h.match(/^#p([34])-d(\d)-(\d+)$/) || (h.match(/^#d(\d)-(\d+)$/) ? ["", "3", ...h.match(/^#d(\d)-(\d+)$/).slice(1)] : null);
+  let m = h.match(/^#p([34s])-d(\d)-(\d+)$/) || (h.match(/^#d(\d)-(\d+)$/) ? ["", "3", ...h.match(/^#d(\d)-(\d+)$/).slice(1)] : null);
   if (m && PROGRAMS[m[1]] && PROGRAMS[m[1]].days[m[2] - 1]){
-    S.program = m[1]; const i = m[2] - 1;
-    if (!(A() && A().prog === m[1] && A().day === i)) S.active = {prog:m[1], day:i, idx:0, sets:{}, weights:{}, started:Date.now()};
-    S.active.idx = +m[3] - 1; save(); startDay(i); return;
+    const pk = m[1], i = m[2] - 1;
+    if (!PROGRAMS[pk].special) S.program = pk;      // opening a special day leaves your plan choice alone
+    if (!(A() && A().prog === pk && A().day === i)) S.active = {prog:pk, day:i, idx:0, sets:{}, weights:{}, started:Date.now()};
+    S.active.idx = Math.max(0, +m[3] - 1); save(); startDay(i, pk); return;
   }
   renderHome();
   if (h === "#history") openHistory(false); else setView("home");

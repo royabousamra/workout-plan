@@ -8,6 +8,11 @@ Open `dist/my-workout-plan.html` in any browser. It's a single file and works of
 
 ## Features
 - **Two programs:** 3 days a week (full body A/B/C) or 4 days a week (upper/lower split). The choice is remembered.
+- **Special days:** two extra workouts outside the programs, done on top of a plan or in place of one of its days.
+  They count toward the week but never change "Next up".
+  - *Chest & back focus:* chest, lats, mid-back and rear shoulders: the muscles under the bra line, front and back.
+  - *Bone builder:* for people on GLP-1 medicines. Heavier lifts (6–8 reps), jumps with soft landings, back extensions
+    and heavy carries to load the hips and spine. It remembers its heavier weights separately from the plan days.
 - **Guided workouts:** a warm-up and 7 exercises per day with Back / Next (or arrow keys). Each exercise shows sets and reps, muscles worked, form cues, an easier option, a platform option and a tutorial video link.
 - **Remembers your progress:** ticked sets, what you used ("10 lb", "green band") and where you are. Leave mid-workout and continue later. Each exercise shows what you used last time.
 - **Check-ins:** finishing a workout asks how it felt and logs it. You can also log a workout or other activity (a walk, a class) by hand, for any past date.
@@ -30,7 +35,7 @@ Cloud sync is off when the page is opened as a local file.
 ## Project layout
 | Path | What it is |
 |---|---|
-| `src/template.html` | Page layout, styles, exercise library, both programs, saving, check-ins and cloud sync |
+| `src/template.html` | Page layout, styles, exercise library, both programs, the special days, saving, check-ins and cloud sync |
 | `src/figures.js` | Animation engine: poses for each exercise, drawn as SVG every frame |
 | `src/figtest.html` | Preview sheet showing each animation at five points in the movement |
 | `assets/photos/` | Start/finish photos for each exercise |
